@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/nomad/client/lib/cgutil"
 	"github.com/hashicorp/nomad/client/pluginmanager/csimanager"
 	"github.com/hashicorp/nomad/client/pluginmanager/drivermanager"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"github.com/hashicorp/nomad/client/serviceregistration"
 	"github.com/hashicorp/nomad/client/serviceregistration/wrapper"
 	cstate "github.com/hashicorp/nomad/client/state"
@@ -86,4 +87,9 @@ type Config struct {
 	// ServiceRegWrapper is the handler wrapper that is used by service hooks
 	// to perform service and check registration and deregistration.
 	ServiceRegWrapper *wrapper.HandlerWrapper
+
+	// TemplateTripper is our custom round tripper used by consul-template when
+	// interacting with Nomad API template functions. This is stored as it
+	// should be reused for all allocations running on the client.
+	TemplateTripper *roundtrip.TemplateTripper
 }

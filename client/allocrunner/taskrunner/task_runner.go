@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"strings"
 	"sync"
 	"time"
@@ -244,6 +245,10 @@ type TaskRunner struct {
 	// serviceRegWrapper is the handler wrapper that is used by service hooks
 	// to perform service and check registration and deregistration.
 	serviceRegWrapper *wrapper.HandlerWrapper
+
+	// templateTripper is our custom round tripper used by consul-template
+	// when interacting with Nomad API template functions.
+	templateTripper *roundtrip.TemplateTripper
 }
 
 type Config struct {
@@ -309,6 +314,10 @@ type Config struct {
 	// ServiceRegWrapper is the handler wrapper that is used by service hooks
 	// to perform service and check registration and deregistration.
 	ServiceRegWrapper *wrapper.HandlerWrapper
+
+	// TemplateTripper is our custom round tripper used by consul-template when
+	// interacting with Nomad API template functions.
+	TemplateTripper *roundtrip.TemplateTripper
 }
 
 func NewTaskRunner(config *Config) (*TaskRunner, error) {
@@ -367,6 +376,7 @@ func NewTaskRunner(config *Config) (*TaskRunner, error) {
 		shutdownDelayCtx:       config.ShutdownDelayCtx,
 		shutdownDelayCancelFn:  config.ShutdownDelayCancelFn,
 		serviceRegWrapper:      config.ServiceRegWrapper,
+		templateTripper:        config.TemplateTripper,
 	}
 
 	// Create the logger based on the allocation ID

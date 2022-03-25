@@ -3,6 +3,7 @@ package allocrunner
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"sync"
 	"time"
 
@@ -182,6 +183,12 @@ type allocRunner struct {
 	// serviceRegWrapper is the handler wrapper that is used by service hooks
 	// to perform service and check registration and deregistration.
 	serviceRegWrapper *wrapper.HandlerWrapper
+
+	// templateTripper is our custom round tripper used by consul-template
+	// when interacting with Nomad API template functions. This is stored as it
+	// should be reused for all allocations running on the client and is passed
+	// from here to the taskrunner and subsequent template manager.
+	templateTripper *roundtrip.TemplateTripper
 }
 
 // RPCer is the interface needed by hooks to make RPC calls.
@@ -226,6 +233,7 @@ func NewAllocRunner(config *Config) (*allocRunner, error) {
 		serversContactedCh:       config.ServersContactedCh,
 		rpcClient:                config.RPCClient,
 		serviceRegWrapper:        config.ServiceRegWrapper,
+		templateTripper:          config.TemplateTripper,
 	}
 
 	// Create the logger based on the allocation ID
@@ -280,6 +288,7 @@ func (ar *allocRunner) initTaskRunners(tasks []*structs.Task) error {
 			StartConditionMetCtx: ar.taskHookCoordinator.startConditionForTask(task),
 			ShutdownDelayCtx:     ar.shutdownDelayCtx,
 			ServiceRegWrapper:    ar.serviceRegWrapper,
+			TemplateTripper:      ar.templateTripper,
 		}
 
 		if ar.cpusetManager != nil {

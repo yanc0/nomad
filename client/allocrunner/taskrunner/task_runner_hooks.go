@@ -106,13 +106,15 @@ func (tr *TaskRunner) initHooks() {
 	// If there are templates is enabled, add the hook
 	if len(task.Templates) != 0 {
 		tr.runnerHooks = append(tr.runnerHooks, newTemplateHook(&templateHookConfig{
-			logger:          hookLogger,
-			lifecycle:       tr,
-			events:          tr,
-			templates:       task.Templates,
-			clientConfig:    tr.clientConfig,
-			envBuilder:      tr.envBuilder,
-			consulNamespace: consulNamespace,
+			logger:               hookLogger,
+			lifecycle:            tr,
+			events:               tr,
+			templates:            task.Templates,
+			clientConfig:         tr.clientConfig,
+			envBuilder:           tr.envBuilder,
+			consulNamespace:      consulNamespace,
+			nomadNamespace:       tr.alloc.Job.Namespace,
+			templateRoundTripper: tr.templateTripper,
 		}))
 	}
 

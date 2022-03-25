@@ -10,6 +10,7 @@ import (
 	ti "github.com/hashicorp/nomad/client/allocrunner/taskrunner/interfaces"
 	"github.com/hashicorp/nomad/client/allocrunner/taskrunner/template"
 	"github.com/hashicorp/nomad/client/config"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"github.com/hashicorp/nomad/client/taskenv"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
@@ -39,6 +40,15 @@ type templateHookConfig struct {
 
 	// consulNamespace is the current Consul namespace
 	consulNamespace string
+
+	// nomadNamespace is the namespace within which the task is registered.
+	// This is used when setting up a template client that interacts with the
+	// Nomad API.
+	nomadNamespace string
+
+	// templateRoundTripper is our custom round tripper used when interacting
+	// with Nomad API template functions.
+	templateRoundTripper *roundtrip.TemplateTripper
 }
 
 type templateHook struct {
@@ -122,6 +132,8 @@ func (h *templateHook) newManager() (unblock chan struct{}, err error) {
 		TaskDir:              h.taskDir,
 		EnvBuilder:           h.config.envBuilder,
 		MaxTemplateEventRate: template.DefaultMaxTemplateEventRate,
+		NomadNamespace:       h.config.nomadNamespace,
+		TemplateRoundTripper: h.config.templateRoundTripper,
 	})
 	if err != nil {
 		h.logger.Error("failed to create template manager", "error", err)

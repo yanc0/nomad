@@ -38,6 +38,7 @@ import (
 	"github.com/hashicorp/nomad/client/pluginmanager"
 	"github.com/hashicorp/nomad/client/pluginmanager/csimanager"
 	"github.com/hashicorp/nomad/client/pluginmanager/drivermanager"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"github.com/hashicorp/nomad/client/servers"
 	"github.com/hashicorp/nomad/client/serviceregistration"
 	"github.com/hashicorp/nomad/client/serviceregistration/nsd"
@@ -320,6 +321,11 @@ type Client struct {
 
 	// EnterpriseClient is used to set and check enterprise features for clients
 	EnterpriseClient *EnterpriseClient
+
+	// templateRoundTripper is our custom round tripper used by consul-template
+	// when interacting with Nomad API template functions. This is stored as it
+	// should be reused for all allocations running on the client.
+	templateRoundTripper *roundtrip.TemplateTripper
 }
 
 var (
@@ -488,6 +494,11 @@ func NewClient(cfg *config.Config, consulCatalog consul.CatalogAPI, consulProxie
 	// client, so we do that here rather than within the agent.
 	c.setupNomadServiceRegistrationHandler()
 	c.serviceRegWrapper = wrapper.NewHandlerWrapper(c.logger, c.consulService, c.nomadService)
+
+	// Set up the template round tripper. This will be passed to each alloc
+	// runner and subsequent task runner for use within the template runner to
+	// handle all Nomad API template functions.
+	c.templateRoundTripper = roundtrip.SetupTemplateRoundTripper(c.secretNodeID())
 
 	// Batching of initial fingerprints is done to reduce the number of node
 	// updates sent to the server on startup. This is the first RPC to the servers
@@ -1170,6 +1181,7 @@ func (c *Client) restoreState() error {
 			DriverManager:       c.drivermanager,
 			ServersContactedCh:  c.serversContactedCh,
 			ServiceRegWrapper:   c.serviceRegWrapper,
+			TemplateTripper:     c.templateRoundTripper,
 			RPCClient:           c,
 		}
 		c.configLock.RUnlock()

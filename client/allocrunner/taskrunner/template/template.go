@@ -19,6 +19,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/nomad/client/allocrunner/taskrunner/interfaces"
 	"github.com/hashicorp/nomad/client/config"
+	"github.com/hashicorp/nomad/client/roundtrip"
 	"github.com/hashicorp/nomad/client/taskenv"
 	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/nomad/structs"
@@ -102,6 +103,13 @@ type TaskTemplateManagerConfig struct {
 
 	// MaxTemplateEventRate is the maximum rate at which we should emit events.
 	MaxTemplateEventRate time.Duration
+
+	// NomadNamespace is the namespace within which the task is registered.
+	NomadNamespace string
+
+	// TemplateRoundTripper is our custom round tripper used when interacting
+	// with Nomad API template functions.
+	TemplateRoundTripper *roundtrip.TemplateTripper
 }
 
 // Validate validates the configuration.
