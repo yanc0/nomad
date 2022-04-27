@@ -122,5 +122,5 @@ jobs:
         with:
           workflow: build
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN}}
-          inputs: '{"build-ref: "${{ needs.prepare-release.outputs.build-ref }}", "make-prerelease": "false"}'
+          inputs: '{"build-ref": "${{ steps.commit-change-push.outputs.build-ref }}", "make-prerelease": "false"}'
           ref: ${{ needs.prepare-release.outputs.build-ref }}
