@@ -35,6 +35,7 @@ var (
 		structs.Plugins,
 		structs.Volumes,
 		structs.ScalingPolicies,
+		structs.SecureVariables,
 		structs.Namespaces,
 	}
 )
@@ -76,6 +77,8 @@ func (s *Search) getPrefixMatches(iter memdb.ResultIterator, prefix string) ([]s
 			id = t.ID
 		case *structs.Namespace:
 			id = t.Name
+		case *structs.SecureVariable:
+			id = t.Path
 		default:
 			matchID, ok := getEnterpriseMatch(raw)
 			if !ok {
@@ -375,6 +378,15 @@ func getResourceIter(context structs.Context, aclObj *acl.ACL, namespace, prefix
 		return store.CSIVolumesByIDPrefix(ws, namespace, prefix)
 	case structs.Namespaces:
 		iter, err := store.NamespacesByNamePrefix(ws, prefix)
+		if err != nil {
+			return nil, err
+		}
+		if aclObj == nil {
+			return iter, nil
+		}
+		return memdb.NewFilterIterator(iter, nsCapFilter(aclObj)), nil
+	case structs.SecureVariables:
+		iter, err := store.GetSecureVariablesByPrefix(ws, prefix)
 		if err != nil {
 			return nil, err
 		}
