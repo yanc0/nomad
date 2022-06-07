@@ -19,6 +19,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// assert each implementation satisfies StateDB interface
+var (
+	_ StateDB = (*BoltStateDB)(nil)
+	_ StateDB = (*MemDB)(nil)
+	_ StateDB = (*NoopDB)(nil)
+	_ StateDB = (*ErrDB)(nil)
+)
+
 func setupBoltStateDB(t *testing.T) *BoltStateDB {
 	dir := t.TempDir()
 

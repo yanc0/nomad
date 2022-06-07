@@ -84,7 +84,8 @@ func testAllocRunnerConfig(t *testing.T, alloc *structs.Allocation) (*Config, fu
 		CpusetManager:      new(cgutil.NoopCpusetManager),
 		ServersContactedCh: make(chan struct{}),
 		ServiceRegWrapper:  wrapper.NewHandlerWrapper(clientConf.Logger, consulRegMock, nomadRegMock),
-		Getter:             getter.TestDefaultGetter(t),
+		// todo: check store
+		Getter: getter.TestDefaultGetter(t),
 	}
 
 	return conf, cleanup

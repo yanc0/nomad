@@ -8,19 +8,22 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	hclog "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad/client/serviceregistration"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks/checkstore"
 	cstructs "github.com/hashicorp/nomad/client/structs"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"gophers.dev/pkgs/netlog"
 )
 
 const (
 	// AllocHealthEventSource is the source used for emitting task events
 	AllocHealthEventSource = "Alloc Unhealthy"
 
-	// consulCheckLookupInterval is the  interval at which we check if the
-	// Consul checks are healthy or unhealthy.
-	consulCheckLookupInterval = 500 * time.Millisecond
+	// checkLookupInterval is the pace at which we check if the Consul or Nomad
+	// checks for an allocation are healthy or unhealthy.
+	checkLookupInterval = 500 * time.Millisecond
 )
 
 // Tracker tracks the health of an allocation and makes health events watchable
@@ -40,22 +43,29 @@ type Tracker struct {
 	// considered healthy
 	minHealthyTime time.Duration
 
-	// checkLookupInterval is the interval at which we check if the
+	// checkPollFrequency is the interval at which we check if the
 	// Consul checks are healthy or unhealthy.
-	checkLookupInterval time.Duration
+	checkPollFrequency time.Duration
 
-	// useChecks specifies whether to use Consul healh checks or not
+	// useChecks specifies whether to consider Consul and Nomad service checks.
 	useChecks bool
 
-	// consulCheckCount is the number of checks the task group will attempt to
-	// register
+	// consulCheckCount is the total number of Consul service checks in the task
+	// group including task level checks.
 	consulCheckCount int
+
+	// nomadCheckCount is the total the number of Nomad service checks in the task
+	// group including task level checks.
+	nomadCheckCount int
 
 	// allocUpdates is a listener for retrieving new alloc updates
 	allocUpdates *cstructs.AllocListener
 
-	// consulClient is used to look up the state of the task's checks
+	// consulClient is used to look up the status of Consul service checks
 	consulClient serviceregistration.Handler
+
+	// checkStore is used to lookup the status of Nomad service checks
+	checkStore checkstore.Shim
 
 	// healthy is used to signal whether we have determined the allocation to be
 	// healthy or unhealthy
@@ -69,11 +79,11 @@ type Tracker struct {
 	// These tasks may terminate without affecting alloc health
 	lifecycleTasks map[string]string
 
-	// l is used to lock shared fields listed below
-	l sync.Mutex
+	// lock is used to lock shared fields listed below
+	lock sync.Mutex
 
 	// tasksHealthy marks whether all the tasks have met their health check
-	// (disregards Consul)
+	// (disregards Consul and Nomad checks)
 	tasksHealthy bool
 
 	// allocFailed marks whether the allocation failed
@@ -82,34 +92,44 @@ type Tracker struct {
 	// checksHealthy marks whether all the task's Consul checks are healthy
 	checksHealthy bool
 
-	// taskHealth contains the health state for each task
+	// taskHealth contains the health state for each task in the allocation
+	// name -> state
 	taskHealth map[string]*taskHealthState
 
+	// logger is for logging things
 	logger hclog.Logger
 }
 
-// NewTracker returns a health tracker for the given allocation. An alloc
-// listener and consul API object are given so that the watcher can detect
-// health changes.
-func NewTracker(parentCtx context.Context, logger hclog.Logger, alloc *structs.Allocation,
-	allocUpdates *cstructs.AllocListener, consulClient serviceregistration.Handler,
-	minHealthyTime time.Duration, useChecks bool) *Tracker {
+// NewTracker returns a health tracker for the given allocation.
+//
+// Depending on job configuration, an allocation's health takes into consideration
+// - An alloc listener
+// - Consul checks (via API object)
+// - Nomad checks (via client state shim)
+func NewTracker(
+	parentCtx context.Context,
+	logger hclog.Logger,
+	alloc *structs.Allocation,
+	allocUpdates *cstructs.AllocListener,
+	consulClient serviceregistration.Handler,
+	checkStore checkstore.Shim,
+	minHealthyTime time.Duration,
+	useChecks bool,
+) *Tracker {
 
-	// Do not create a named sub-logger as the hook controlling
-	// this struct should pass in an appropriately named
-	// sub-logger.
 	t := &Tracker{
-		healthy:             make(chan bool, 1),
-		allocStopped:        make(chan struct{}),
-		alloc:               alloc,
-		tg:                  alloc.Job.LookupTaskGroup(alloc.TaskGroup),
-		minHealthyTime:      minHealthyTime,
-		useChecks:           useChecks,
-		allocUpdates:        allocUpdates,
-		consulClient:        consulClient,
-		checkLookupInterval: consulCheckLookupInterval,
-		logger:              logger,
-		lifecycleTasks:      map[string]string{},
+		healthy:            make(chan bool, 1),
+		allocStopped:       make(chan struct{}),
+		alloc:              alloc,
+		tg:                 alloc.Job.LookupTaskGroup(alloc.TaskGroup),
+		minHealthyTime:     minHealthyTime,
+		useChecks:          useChecks,
+		allocUpdates:       allocUpdates,
+		consulClient:       consulClient,
+		checkStore:         checkStore,
+		checkPollFrequency: checkLookupInterval,
+		logger:             logger,
+		lifecycleTasks:     map[string]string{},
 	}
 
 	t.taskHealth = make(map[string]*taskHealthState, len(t.tg.Tasks))
@@ -120,17 +140,31 @@ func NewTracker(parentCtx context.Context, logger hclog.Logger, alloc *structs.A
 			t.lifecycleTasks[task.Name] = task.Lifecycle.Hook
 		}
 
-		for _, s := range task.Services {
-			t.consulCheckCount += len(s.Checks)
-		}
+		c, n := countChecks(task.Services)
+		t.consulCheckCount += c
+		t.nomadCheckCount += n
 	}
 
-	for _, s := range t.tg.Services {
-		t.consulCheckCount += len(s.Checks)
-	}
+	c, n := countChecks(t.tg.Services)
+	t.consulCheckCount += c
+	t.nomadCheckCount += n
+
+	netlog.Yellow("NewTracker consulCheckCount: %d, nomadCheckCount: %d", t.consulCheckCount, t.nomadCheckCount)
 
 	t.ctx, t.cancelFn = context.WithCancel(parentCtx)
 	return t
+}
+
+func countChecks(services []*structs.Service) (consul, nomad int) {
+	for _, service := range services {
+		switch service.Provider {
+		case structs.ServiceProviderConsul:
+			consul += len(service.Checks)
+		case structs.ServiceProviderNomad:
+			nomad += len(service.Checks)
+		}
+	}
+	return
 }
 
 // Start starts the watcher.
@@ -138,6 +172,7 @@ func (t *Tracker) Start() {
 	go t.watchTaskEvents()
 	if t.useChecks {
 		go t.watchConsulEvents()
+		go t.watchNomadEvents()
 	}
 }
 
@@ -157,8 +192,8 @@ func (t *Tracker) AllocStoppedCh() <-chan struct{} {
 // health has been determined. Only tasks that have contributed to the
 // allocation being unhealthy will have an event.
 func (t *Tracker) TaskEvents() map[string]*structs.TaskEvent {
-	t.l.Lock()
-	defer t.l.Unlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	// Nothing to do since the failure wasn't task related
 	if t.allocFailed {
@@ -180,61 +215,89 @@ func (t *Tracker) TaskEvents() map[string]*structs.TaskEvent {
 }
 
 // setTaskHealth is used to set the tasks health as healthy or unhealthy. If the
-// allocation is terminal, health is immediately broadcasted.
+// allocation is terminal, health is immediately broadcast.
 func (t *Tracker) setTaskHealth(healthy, terminal bool) {
-	t.l.Lock()
-	defer t.l.Unlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	netlog.Purple("Tracker.setTaskHealth, healthy: %t, terminal: %t", healthy, terminal)
+
 	t.tasksHealthy = healthy
 
 	// if unhealthy, force waiting for new checks health status
 	if !terminal && !healthy {
 		t.checksHealthy = false
+		netlog.Purple("Tracker.setTaskHealth force wait for new checks status")
 		return
 	}
 
-	// If we are marked healthy but we also require Consul to be healthy and it
-	// isn't yet, return, unless the task is terminal
-	requireConsul := t.useChecks && t.consulCheckCount > 0
-	if !terminal && healthy && requireConsul && !t.checksHealthy {
+	// If we are marked healthy but we also require Consul checks to be healthy
+	// and they are not yet, return, unless the task is terminal.
+	usesConsulChecks := t.useChecks && t.consulCheckCount > 0
+	netlog.Purple("Tracker.setTaskHealth usesConsulChecks: %t", usesConsulChecks)
+	if !terminal && healthy && usesConsulChecks && !t.checksHealthy {
+		netlog.Purple("Tracker.setTaskHealth tasks are healthy but consul checks are not")
+		return
+	}
+
+	// If we are marked healthy but also require Nomad checks to be healthy and
+	// they are not yet, return, unless the task is terminal.
+	usesNomadChecks := t.useChecks && t.nomadCheckCount > 0
+	netlog.Purple("Tracker.setTaskHealth requireNomad: %t", usesNomadChecks)
+	if !terminal && healthy && usesNomadChecks && !t.checksHealthy {
+		netlog.Purple("Tracker.setTaskHealth tasks are healthy but nomad checks are not")
 		return
 	}
 
 	select {
 	case t.healthy <- healthy:
+		netlog.Purple("Tracker.setTaskHealth update healthy: %t", healthy)
 	default:
 	}
 
 	// Shutdown the tracker
+	netlog.Purple("Tracker.setTaskHealth do cancelFn")
 	t.cancelFn()
 }
 
 // setCheckHealth is used to mark the checks as either healthy or unhealthy.
 // returns true if health is propagated and no more health monitoring is needed
+//
+// todo(shoenig) this is currently being shared by watchConsulEvents and watchNomadEvents,
+//  and must be split up if/when we support registering services (and thus checks)
+//  of different providers.
 func (t *Tracker) setCheckHealth(healthy bool) bool {
-	t.l.Lock()
-	defer t.l.Unlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	// check health should always be false if tasks are unhealthy
 	// as checks might be missing from unhealthy tasks
 	t.checksHealthy = healthy && t.tasksHealthy
 
+	netlog.Yellow("Tracker.setCheckHealth, healthy: %t, tasksHealthy: %t, checksHealthy: %t", healthy, t.tasksHealthy, t.checksHealthy)
+
 	// Only signal if we are healthy and so is the tasks
 	if !t.checksHealthy {
+		netlog.Yellow("Tracker.setCheckHealth checks not healthy")
 		return false
 	}
 
 	select {
 	case t.healthy <- healthy:
+		netlog.Yellow("Tracker.setCheckHealth health updated to: %v", healthy)
 	default:
+		netlog.Yellow("Tracker.setCheckHealth health not updated")
 	}
 
-	// Shutdown the tracker
+	// Shutdown the tracker, things are healthy so nothing to do
+	netlog.Yellow("Tracker.setCheckHealth do cancelFn")
 	t.cancelFn()
 	return true
 }
 
 // markAllocStopped is used to mark the allocation as having stopped.
 func (t *Tracker) markAllocStopped() {
+	netlog.Yellow("Tracker.markAllocStopped close allocStopped and do cancelFn")
 	close(t.allocStopped)
 	t.cancelFn()
 }
@@ -262,7 +325,7 @@ func (t *Tracker) watchTaskEvents() {
 		}
 
 		// Store the task states
-		t.l.Lock()
+		t.lock.Lock()
 		for task, state := range alloc.TaskStates {
 			//TODO(schmichael) for now skip unknown tasks as
 			//they're task group services which don't currently
@@ -271,7 +334,7 @@ func (t *Tracker) watchTaskEvents() {
 				v.state = state
 			}
 		}
-		t.l.Unlock()
+		t.lock.Unlock()
 
 		// Detect if the alloc is unhealthy or if all tasks have started yet
 		latestStartTime := time.Time{}
@@ -308,9 +371,9 @@ func (t *Tracker) watchTaskEvents() {
 		// individual tasks failed, that means something failed at the alloc
 		// level.
 		if alloc.ClientStatus == structs.AllocClientStatusFailed {
-			t.l.Lock()
+			t.lock.Lock()
 			t.allocFailed = true
-			t.l.Unlock()
+			t.lock.Unlock()
 
 			t.setTaskHealth(false, true)
 			return
@@ -349,27 +412,57 @@ func (t *Tracker) watchTaskEvents() {
 	}
 }
 
-// watchConsulEvents is a  watcher for the health of the allocation's Consul
-// checks. If all checks report healthy the watcher will exit after the
-// MinHealthyTime has been reached, Otherwise the watcher will continue to
-// check unhealthy checks until the ctx is cancelled
-func (t *Tracker) watchConsulEvents() {
-	// checkTicker is the ticker that triggers us to look at the checks in
-	// Consul
-	checkTicker := time.NewTicker(t.checkLookupInterval)
-	defer checkTicker.Stop()
+// healthyFuture is used to fire after checks have been healthy for MinHealthyTime
+type healthyFuture struct {
+	timer *time.Timer
+}
 
-	// healthyTimer fires when the checks have been healthy for the
-	// MinHealthyTime
-	healthyTimer := time.NewTimer(0)
-	if !healthyTimer.Stop() {
+// newHealthyFuture will create a healthyFuture in a disabled state
+func newHealthyFuture() *healthyFuture {
+	timer := time.NewTimer(0)
+	ht := &healthyFuture{timer: timer}
+	ht.disable()
+	return ht
+}
+
+// disable the healthyFuture from triggering
+func (h *healthyFuture) disable() {
+	if !h.timer.Stop() {
 		select {
-		case <-healthyTimer.C:
+		case <-h.timer.C:
 		default:
 		}
 	}
+}
 
-	// primed marks whether the healthy timer has been set
+// wait will reset the healthyFuture to trigger after dur passes.
+func (h *healthyFuture) wait(dur time.Duration) {
+	h.timer.Reset(dur)
+}
+
+// C returns a channel on which the future will send when ready.
+func (h *healthyFuture) C() <-chan time.Time {
+	return h.timer.C
+}
+
+type CheckChecker interface {
+}
+
+// watchConsulEvents is a watcher for the health of the allocation's Consul
+// checks. If all checks report healthy the watcher will exit after the
+// MinHealthyTime has been reached, otherwise the watcher will continue to
+// check unhealthy checks until the ctx is cancelled.
+//
+// Does not watch Nomad service checks; see watchNomadEvents for those.
+func (t *Tracker) watchConsulEvents() {
+	// checkTicker is the ticker that triggers us to look at the checks in Consul
+	checkTicker := time.NewTicker(t.checkPollFrequency)
+	defer checkTicker.Stop()
+
+	// waiter is used to fire when the checks have been healthy for the MinHealthyTime
+	waiter := newHealthyFuture()
+
+	// primed marks whether the healthy waiter has been set
 	primed := false
 
 	// Store whether the last Consul checks call was successful or not
@@ -381,8 +474,12 @@ func (t *Tracker) watchConsulEvents() {
 OUTER:
 	for {
 		select {
+
+		// we are shutting down
 		case <-t.ctx.Done():
 			return
+
+		// it is time to check the checks
 		case <-checkTicker.C:
 			newAllocReg, err := t.consulClient.AllocRegistrations(t.alloc.ID)
 			if err != nil {
@@ -395,12 +492,15 @@ OUTER:
 				consulChecksErr = false
 				allocReg = newAllocReg
 			}
-		case <-healthyTimer.C:
+
+			// enough time has passed with healthy checks
+		case <-waiter.C():
 			if t.setCheckHealth(true) {
 				// final health set and propagated
 				return
 			}
-			// tasks are unhealthy, reset and wait until all is healthy
+			// checks are healthy but tasks are unhealthy,
+			// reset and wait until all is healthy
 			primed = false
 		}
 
@@ -409,7 +509,7 @@ OUTER:
 		}
 
 		// Store the task registrations
-		t.l.Lock()
+		t.lock.Lock()
 		for task, reg := range allocReg.Tasks {
 			//TODO(schmichael) for now skip unknown tasks as
 			//they're task group services which don't currently
@@ -418,7 +518,7 @@ OUTER:
 				v.taskRegistrations = reg
 			}
 		}
-		t.l.Unlock()
+		t.lock.Unlock()
 
 		// Detect if all the checks are passing
 		passed := true
@@ -427,16 +527,16 @@ OUTER:
 		for _, treg := range allocReg.Tasks {
 			for _, sreg := range treg.Services {
 				for _, check := range sreg.Checks {
-					onupdate := sreg.CheckOnUpdate[check.CheckID]
+					onUpdate := sreg.CheckOnUpdate[check.CheckID]
 					switch check.Status {
 					case api.HealthPassing:
 						continue
 					case api.HealthWarning:
-						if onupdate == structs.OnUpdateIgnoreWarn || onupdate == structs.OnUpdateIgnore {
+						if onUpdate == structs.OnUpdateIgnoreWarn || onUpdate == structs.OnUpdateIgnore {
 							continue
 						}
 					case api.HealthCritical:
-						if onupdate == structs.OnUpdateIgnore {
+						if onUpdate == structs.OnUpdateIgnore {
 							continue
 						}
 					default:
@@ -452,25 +552,108 @@ OUTER:
 		if !passed {
 			// Reset the timer since we have transitioned back to unhealthy
 			if primed {
-				if !healthyTimer.Stop() {
-					select {
-					case <-healthyTimer.C:
-					default:
-					}
-				}
 				primed = false
+				waiter.disable()
 			}
 		} else if !primed {
 			// Reset the timer to fire after MinHealthyTime
-			if !healthyTimer.Stop() {
-				select {
-				case <-healthyTimer.C:
-				default:
-				}
+			primed = true
+			waiter.disable()
+			waiter.wait(t.minHealthyTime)
+		}
+	}
+}
+
+// watchNomadEvents is a watcher for the health of the allocation's Nomad checks.
+// If all checks report healthy the watcher will exit after the MinHealthyTime has
+// been reached, otherwise the watcher will continue to check unhealthy checks until
+// the ctx is cancelled.
+//
+// Does not watch Consul service checks; see watchConsulEvents for those.
+func (t *Tracker) watchNomadEvents() {
+	// checkTicker is the ticker that triggers us to look at the checks in Nomad
+	checkTicker := time.NewTicker(t.checkPollFrequency)
+	defer checkTicker.Stop()
+
+	// waiter is used to fire when the checks have been healthy for the MinHealthyTime
+	waiter := newHealthyFuture()
+
+	// allocID of the allocation we are watching checks for
+	allocID := t.alloc.ID
+
+	// primed marks whether the healthy waiter has been set
+	primed := false
+
+	var results map[checks.ID]*checks.QueryResult
+
+	for {
+		netlog.Green("enter loop, alloc: %s", allocID)
+
+		select {
+
+		// we are shutting down
+		case <-t.ctx.Done():
+			netlog.Green("shutting down, alloc: %s", allocID)
+			return
+
+		// it is time to check the checks
+		case <-checkTicker.C:
+			results = t.checkStore.List(allocID)
+			netlog.Green("got %d results, alloc: %s", len(results), allocID)
+			for id, result := range results {
+				netlog.Green("result[%s]: %s", id, result)
 			}
 
+		// enough time has passed with healthy checks
+		case <-waiter.C():
+			netlog.Green("waiter done, alloc: %s", allocID)
+			if t.setCheckHealth(true) { // todo(shoenig) this needs to be split between Consul and Nomad
+				netlog.Green("final health propagated, alloc: %s", allocID)
+				return // final health set and propagated
+			}
+			// checks are healthy but tasks are unhealthy, reset and wait
+			netlog.Green("checks are healthy but tasks unhealthy, alloc: %s", allocID)
+			primed = false
+		}
+
+		// detect if any checks are failing
+		passing := true
+
+		for _, result := range results {
+			netlog.Green("switch on result: %s", result)
+			switch result.Result {
+			case checks.Success:
+				netlog.Green("-> success")
+				continue
+			case checks.Failure:
+				if result.Kind == checks.Readiness {
+					netlog.Green("-> failure, readiness")
+					continue
+				}
+				netlog.Green("-> failure, healthiness")
+				passing = false
+				break
+			default:
+				passing = false
+				netlog.Red("-> not a valid result: %v", result.Result)
+				break
+			}
+		}
+
+		if !passing {
+			netlog.Green("not passing, transition to unhealthy")
+			// at least one check is failing, transition to unhealthy
+			t.setCheckHealth(false)
+			primed = false
+			waiter.disable()
+		}
+
+		if passing && !primed {
+			netlog.Green("passing but not yet primed, set timer")
+			// healthy but not yet primed, set timer to wait
 			primed = true
-			healthyTimer.Reset(t.minHealthyTime)
+			waiter.disable()
+			waiter.wait(t.minHealthyTime)
 		}
 	}
 }
@@ -488,15 +671,15 @@ type taskHealthState struct {
 // strategy of the group. It returns true if the task has contributed to the
 // allocation being unhealthy and if so, an event description of why.
 func (t *taskHealthState) event(deadline time.Time, healthyDeadline, minHealthyTime time.Duration, useChecks bool) (string, bool) {
-	requireChecks := false
+	netlog.Yellow("event useChecks: %t", useChecks)
 	desiredChecks := 0
 	for _, s := range t.task.Services {
 		if nc := len(s.Checks); nc > 0 {
-			requireChecks = true
 			desiredChecks += nc
 		}
 	}
-	requireChecks = requireChecks && useChecks
+	requireChecks := (desiredChecks > 0) && useChecks
+	netlog.Yellow("desiredChecks: %d, requireChecks: %t", desiredChecks, requireChecks)
 
 	if t.state != nil {
 		if t.state.Failed {
@@ -507,7 +690,7 @@ func (t *taskHealthState) event(deadline time.Time, healthyDeadline, minHealthyT
 		case structs.TaskStatePending:
 			return fmt.Sprintf("Task not running by healthy_deadline of %v", healthyDeadline), true
 		case structs.TaskStateDead:
-			// hook tasks are healthy when dead successfully
+			// non-sidecar hook lifecycle tasks are healthy if they exit with success
 			if t.task.Lifecycle == nil || t.task.Lifecycle.Sidecar {
 				return "Unhealthy because of dead task", true
 			}
@@ -516,6 +699,22 @@ func (t *taskHealthState) event(deadline time.Time, healthyDeadline, minHealthyT
 			if t.state.StartedAt.Add(minHealthyTime).After(deadline) {
 				return fmt.Sprintf("Task not running for min_healthy_time of %v by healthy_deadline of %v", minHealthyTime, healthyDeadline), true
 			}
+		}
+	}
+
+	// HI, discrepancy between t.task.Services and t.taskRegistrations.Services
+	// double check t.tR is empty while t.t is not
+
+	for _, service := range t.task.Services {
+		for _, check := range service.Checks {
+			netlog.Yellow("t.task.service[%s].check[%s]", service.Name, check.Name)
+		}
+	}
+
+	netlog.Yellow("len t.taskRegistrations.Services: %d", len(t.taskRegistrations.Services))
+	for _, reg := range t.taskRegistrations.Services {
+		for _, check := range reg.Checks {
+			netlog.Yellow("t.taskRegistrations.reg[%s].check[%s]", reg.Service.Service, check.Name)
 		}
 	}
 

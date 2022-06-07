@@ -3,12 +3,15 @@ package state
 import (
 	"sync"
 
-	hclog "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad/client/allocrunner/taskrunner/state"
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
+	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"gophers.dev/pkgs/netlog"
 )
 
 // MemDB implements a StateDB that stores data in memory and should only be
@@ -26,6 +29,9 @@ type MemDB struct {
 	// alloc_id -> task_name -> value
 	localTaskState map[string]map[string]*state.LocalState
 	taskState      map[string]map[string]*structs.TaskState
+
+	// alloc_id -> check_id -> result
+	checks map[string]map[checks.ID]*checks.QueryResult
 
 	// devicemanager -> plugin-state
 	devManagerPs *dmstate.PluginState
@@ -73,7 +79,9 @@ func (m *MemDB) GetAllAllocations() ([]*structs.Allocation, map[string]error, er
 	return allocs, map[string]error{}, nil
 }
 
-func (m *MemDB) PutAllocation(alloc *structs.Allocation, opts ...WriteOption) error {
+func (m *MemDB) PutAllocation(alloc *structs.Allocation, _ ...WriteOption) error {
+	netlog.Yellow("PutAllocation: %s, %s", alloc.ID, alloc.Name)
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.allocs[alloc.ID] = alloc
@@ -99,7 +107,7 @@ func (m *MemDB) GetNetworkStatus(allocID string) (*structs.AllocNetworkStatus, e
 	return m.networkStatus[allocID], nil
 }
 
-func (m *MemDB) PutNetworkStatus(allocID string, ns *structs.AllocNetworkStatus, opts ...WriteOption) error {
+func (m *MemDB) PutNetworkStatus(allocID string, ns *structs.AllocNetworkStatus, _ ...WriteOption) error {
 	m.mu.Lock()
 	m.networkStatus[allocID] = ns
 	defer m.mu.Unlock()
@@ -129,6 +137,8 @@ func (m *MemDB) GetTaskRunnerState(allocID string, taskName string) (*state.Loca
 }
 
 func (m *MemDB) PutTaskRunnerLocalState(allocID string, taskName string, val *state.LocalState) error {
+	netlog.Yellow("PutTaskRunnerLocalState allocID: %s, taskName: %s, hooks: %d", allocID, taskName, len(val.Hooks))
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -145,6 +155,8 @@ func (m *MemDB) PutTaskRunnerLocalState(allocID string, taskName string, val *st
 }
 
 func (m *MemDB) PutTaskState(allocID string, taskName string, state *structs.TaskState) error {
+	netlog.Yellow("PutTaskState allocID: %s, taskName: %s, events: %d", allocID, taskName, len(state.Events))
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -161,6 +173,8 @@ func (m *MemDB) PutTaskState(allocID string, taskName string, state *structs.Tas
 }
 
 func (m *MemDB) DeleteTaskBucket(allocID, taskName string) error {
+	netlog.Yellow("DeleteTaskBucket allocID: %s, taskName: %s", allocID, taskName)
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -175,7 +189,9 @@ func (m *MemDB) DeleteTaskBucket(allocID, taskName string) error {
 	return nil
 }
 
-func (m *MemDB) DeleteAllocationBucket(allocID string, opts ...WriteOption) error {
+func (m *MemDB) DeleteAllocationBucket(allocID string, _ ...WriteOption) error {
+	netlog.Yellow("DeleteAllocationBucket: allocID: %s", allocID)
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -224,6 +240,36 @@ func (m *MemDB) PutDynamicPluginRegistryState(ps *dynamicplugins.RegistryState) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.dynamicManagerPs = ps
+	return nil
+}
+
+func (m *MemDB) PutCheckResult(allocID string, qr *checks.QueryResult) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.checks[allocID][qr.ID] = qr
+	return nil
+}
+
+func (m *MemDB) GetCheckResults(allocID string) (map[checks.ID]*checks.QueryResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return helper.CopyMap(m.checks[allocID]), nil
+}
+
+func (m *MemDB) DeleteCheckResults(allocID string, checkIDs []checks.ID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, id := range checkIDs {
+		delete(m.checks[allocID], id)
+	}
+	return nil
+}
+
+func (m *MemDB) PurgeCheckResults(allocID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.checks, allocID)
 	return nil
 }
 

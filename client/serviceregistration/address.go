@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/nomad/nomad/structs"
 	"github.com/hashicorp/nomad/plugins/drivers"
+	"gophers.dev/pkgs/netlog"
 )
 
 // GetAddress returns the IP (or custom advertise address) and port to use for a
@@ -21,6 +22,9 @@ func GetAddress(
 	ports structs.AllocatedPorts,
 	netStatus *structs.AllocNetworkStatus,
 ) (string, int, error) {
+
+	netlog.Red("GetAddress, address: %s, mode: %s, label: %s", address, addressMode, portLabel)
+
 	switch addressMode {
 	case structs.AddressModeAuto:
 		switch {

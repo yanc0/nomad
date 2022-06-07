@@ -79,7 +79,7 @@ func TestTracker_Checks_Healthy(t *testing.T) {
 	checkInterval := 10 * time.Millisecond
 	tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 		time.Millisecond, true)
-	tracker.checkLookupInterval = checkInterval
+	tracker.checkPollFrequency = checkInterval
 	tracker.Start()
 
 	select {
@@ -119,7 +119,7 @@ func TestTracker_Checks_PendingPostStop_Healthy(t *testing.T) {
 	checkInterval := 10 * time.Millisecond
 	tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 		time.Millisecond, true)
-	tracker.checkLookupInterval = checkInterval
+	tracker.checkPollFrequency = checkInterval
 	tracker.Start()
 
 	select {
@@ -160,7 +160,7 @@ func TestTracker_Succeeded_PostStart_Healthy(t *testing.T) {
 	checkInterval := 10 * time.Millisecond
 	tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 		alloc.Job.TaskGroups[0].Migrate.MinHealthyTime, true)
-	tracker.checkLookupInterval = checkInterval
+	tracker.checkPollFrequency = checkInterval
 	tracker.Start()
 
 	select {
@@ -239,7 +239,7 @@ func TestTracker_Checks_Unhealthy(t *testing.T) {
 	checkInterval := 10 * time.Millisecond
 	tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 		time.Millisecond, true)
-	tracker.checkLookupInterval = checkInterval
+	tracker.checkPollFrequency = checkInterval
 	tracker.Start()
 
 	testutil.WaitForResult(func() (bool, error) {
@@ -249,9 +249,9 @@ func TestTracker_Checks_Unhealthy(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	tracker.l.Lock()
+	tracker.lock.Lock()
 	require.False(t, tracker.checksHealthy)
-	tracker.l.Unlock()
+	tracker.lock.Unlock()
 
 	select {
 	case v := <-tracker.HealthyCh():
@@ -381,7 +381,7 @@ func TestTracker_Checks_Healthy_Before_TaskHealth(t *testing.T) {
 	checkInterval := 10 * time.Millisecond
 	tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 		time.Millisecond, true)
-	tracker.checkLookupInterval = checkInterval
+	tracker.checkPollFrequency = checkInterval
 	tracker.Start()
 
 	// assert that we don't get marked healthy
@@ -523,7 +523,7 @@ func TestTracker_Checks_OnUpdate(t *testing.T) {
 			checkInterval := 10 * time.Millisecond
 			tracker := NewTracker(ctx, logger, alloc, b.Listen(), consul,
 				time.Millisecond, true)
-			tracker.checkLookupInterval = checkInterval
+			tracker.checkPollFrequency = checkInterval
 			tracker.Start()
 
 			select {

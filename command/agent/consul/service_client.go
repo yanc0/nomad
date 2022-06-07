@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/helper/envoy"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"gophers.dev/pkgs/netlog"
 )
 
 const (
@@ -1319,6 +1320,9 @@ func normalizeNamespace(namespace string) string {
 // AllocRegistrations returns the registrations for the given allocation. If the
 // allocation has no registrations, the response is a nil object.
 func (c *ServiceClient) AllocRegistrations(allocID string) (*serviceregistration.AllocRegistration, error) {
+
+	netlog.Yellow("AllocRegistrations, alloc_id: %s", allocID)
+
 	// Get the internal struct using the lock
 	c.allocRegistrationsLock.RLock()
 	regInternal, ok := c.allocRegistrations[allocID]
