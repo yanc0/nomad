@@ -217,6 +217,10 @@ func (s *Search) fuzzyMatchSingle(raw interface{}, text string) (structs.Context
 	case *structs.CSIPlugin:
 		name = t.ID
 		ctx = structs.Plugins
+	case *structs.SecureVariable:
+		name = t.Path
+		scope = []string{t.Namespace, t.Path}
+		ctx = structs.SecureVariables
 	}
 
 	if idx := fuzzyIndex(name, text); idx >= 0 {
@@ -422,6 +426,13 @@ func getFuzzyResourceIterator(context structs.Context, aclObj *acl.ACL, namespac
 		}
 		return store.AllocsByNamespace(ws, namespace)
 
+	case structs.SecureVariables:
+		if wildcard(namespace) {
+			iter, err := store.SecureVariables(ws)
+			return nsCapIterFilter(iter, err, aclObj)
+		}
+		return store.GetSecureVariablesByNamespace(ws, namespace)
+
 	case structs.Nodes:
 		if wildcard(namespace) {
 			iter, err := store.Nodes(ws)
@@ -467,6 +478,10 @@ func nsCapFilter(aclObj *acl.ACL) memdb.FilterFunc {
 			return !aclObj.AllowNsOp(t.Namespace, acl.NamespaceCapabilityReadJob)
 
 		case *structs.Allocation:
+			return !aclObj.AllowNsOp(t.Namespace, acl.NamespaceCapabilityReadJob)
+
+		case *structs.SecureVariable:
+			// FIXME: Update to final implementation.
 			return !aclObj.AllowNsOp(t.Namespace, acl.NamespaceCapabilityReadJob)
 
 		case *structs.Namespace:
