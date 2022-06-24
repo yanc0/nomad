@@ -20,6 +20,7 @@ const (
 	errNodeLacksRpc               = "Node does not support RPC; requires 0.8 or later"
 	errMissingAllocID             = "Missing allocation ID"
 	errIncompatibleFiltering      = "Filter expression cannot be used with other filter parameters"
+	errTooManyRequests            = "Too many requests"
 
 	// Prefix based errors that are used to check if the error is of a given
 	// type. These errors should be created with the associated constructor.
@@ -55,8 +56,8 @@ var (
 	ErrNodeLacksRpc               = errors.New(errNodeLacksRpc)
 	ErrMissingAllocID             = errors.New(errMissingAllocID)
 	ErrIncompatibleFiltering      = errors.New(errIncompatibleFiltering)
-
-	ErrUnknownNode = errors.New(ErrUnknownNodePrefix)
+	ErrUnknownNode                = errors.New(ErrUnknownNodePrefix)
+	ErrTooManyRequests            = errors.New(errTooManyRequests)
 
 	ErrDeploymentTerminalNoCancel    = errors.New(errDeploymentTerminalNoCancel)
 	ErrDeploymentTerminalNoFail      = errors.New(errDeploymentTerminalNoFail)
