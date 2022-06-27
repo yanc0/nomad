@@ -11,10 +11,10 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
-	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/helper/boltdd"
 	"github.com/hashicorp/nomad/nomad/structs"
 	"go.etcd.io/bbolt"
+	"gophers.dev/pkgs/netlog"
 )
 
 /*
@@ -723,7 +723,8 @@ func (s *BoltStateDB) GetDynamicPluginRegistryState() (*dynamicplugins.RegistryS
 }
 
 // PutCheckResult puts qr into the state store.
-func (s *BoltStateDB) PutCheckResult(allocID string, qr *checks.QueryResult) error {
+func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) error {
+	netlog.Red("BoltStateDB.PutCheckResult not yet implemented")
 	return s.db.Update(func(tx *boltdd.Tx) error {
 		// todo
 		return nil
@@ -731,8 +732,9 @@ func (s *BoltStateDB) PutCheckResult(allocID string, qr *checks.QueryResult) err
 }
 
 // GetCheckResults gets the check results associated with allocID from the state store.
-func (s *BoltStateDB) GetCheckResults(allocID string) (map[checks.ID]*checks.QueryResult, error) {
-	var m map[checks.ID]*checks.QueryResult
+func (s *BoltStateDB) GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error) {
+	netlog.Red("BoltStateDB.GetCheckResults not yet implemented")
+	var m map[structs.CheckID]*structs.CheckQueryResult
 	err := s.db.View(func(tx *boltdd.Tx) error {
 		// todo
 		return nil
@@ -740,12 +742,14 @@ func (s *BoltStateDB) GetCheckResults(allocID string) (map[checks.ID]*checks.Que
 	return m, err
 }
 
-func (s *BoltStateDB) DeleteCheckResults(allocID string, checkIDs []checks.ID) error {
+func (s *BoltStateDB) DeleteCheckResults(allocID string, checkIDs []structs.CheckID) error {
+	netlog.Red("BoltStateDB.DeleteCheckResults not yet implemented")
 	// todo
 	return nil
 }
 
 func (s *BoltStateDB) PurgeCheckResults(allocID string) error {
+	netlog.Red("BoltStateDB.PurgeCheckResults not yet implemented")
 	// todo
 	return nil
 }

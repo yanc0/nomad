@@ -21,7 +21,7 @@ const (
 
 // observers maintains a map from check_id -> observer for a particular check. Each
 // observer in the map must share the same context.
-type observers map[checks.ID]*observer
+type observers map[structs.CheckID]*observer
 
 // An observer is used to execute a particular check on its interval and update the
 // check store with those results.
@@ -49,7 +49,7 @@ func (o *observer) start() {
 		case <-timer.C:
 
 			// execute the check
-			query := checks.GetQuery(o.check)
+			query := checks.GetCheckQuery(o.check)
 			result := o.checker.Do(o.qc, query)
 
 			netlog.Cyan("observer result: %s ...", result)
@@ -133,7 +133,7 @@ func (h *checksHook) initialize(alloc *structs.Allocation) {
 				continue
 			}
 			for _, check := range service.Checks {
-				id := checks.MakeID(alloc.ID, alloc.TaskGroup, name, check.Name)
+				id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, name, check.Name)
 				h.observers[id] = &observer{
 					ctx:     h.ctx,
 					check:   check.Copy(),
@@ -175,7 +175,7 @@ func (h *checksHook) Prerun() error {
 
 	// insert a pending result into state store for each check
 	for _, obs := range h.observers {
-		result := checks.Stub(obs.qc.ID, checks.GetKind(obs.check), now)
+		result := checks.Stub(obs.qc.ID, structs.GetCheckMode(obs.check), now)
 		if err := h.shim.Set(h.allocID, result); err != nil {
 			return err
 		}

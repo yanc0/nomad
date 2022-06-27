@@ -5,7 +5,6 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
-	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
 
@@ -85,16 +84,16 @@ type StateDB interface {
 	PutDynamicPluginRegistryState(state *dynamicplugins.RegistryState) error
 
 	// PutCheckResult sets the query result for the check implied in qr.
-	PutCheckResult(allocID string, qr *checks.QueryResult) error
+	PutCheckResult(allocID string, qr *structs.CheckQueryResult) error
 
 	// DeleteCheckResults removes the given set of check results.
-	DeleteCheckResults(allocID string, checkIDs []checks.ID) error
+	DeleteCheckResults(allocID string, checkIDs []structs.CheckID) error
 
 	// PurgeCheckResults removes all check results of the given allocation.
 	PurgeCheckResults(allocID string) error
 
 	// GetCheckResults gets the query result for the alloc.
-	GetCheckResults(allocID string) (map[checks.ID]*checks.QueryResult, error)
+	GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error)
 
 	// Close the database. Unsafe for further use after calling regardless
 	// of return value.

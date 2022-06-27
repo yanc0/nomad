@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad/client/serviceregistration"
-	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/client/serviceregistration/checks/checkstore"
 	cstructs "github.com/hashicorp/nomad/client/structs"
 	"github.com/hashicorp/nomad/nomad/structs"
@@ -584,7 +583,7 @@ func (t *Tracker) watchNomadEvents() {
 	// primed marks whether the healthy waiter has been set
 	primed := false
 
-	var results map[checks.ID]*checks.QueryResult
+	var results map[structs.CheckID]*structs.CheckQueryResult
 
 	for {
 		netlog.Green("enter loop, alloc: %s", allocID)
@@ -621,12 +620,12 @@ func (t *Tracker) watchNomadEvents() {
 
 		for _, result := range results {
 			netlog.Green("switch on result: %s", result)
-			switch result.Result {
-			case checks.Success:
+			switch result.Status {
+			case structs.CheckSuccess:
 				netlog.Green("-> success")
 				continue
-			case checks.Failure:
-				if result.Kind == checks.Readiness {
+			case structs.CheckFailure:
+				if result.Kind == structs.Readiness {
 					netlog.Green("-> failure, readiness")
 					continue
 				}
@@ -635,7 +634,7 @@ func (t *Tracker) watchNomadEvents() {
 				break
 			default:
 				passing = false
-				netlog.Red("-> not a valid result: %v", result.Result)
+				netlog.Red("-> not a valid result: %v", result.Status)
 				break
 			}
 		}

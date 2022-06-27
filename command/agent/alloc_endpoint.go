@@ -16,6 +16,7 @@ import (
 	cstructs "github.com/hashicorp/nomad/client/structs"
 	"github.com/hashicorp/nomad/nomad/structs"
 	"github.com/hashicorp/nomad/plugins/drivers"
+	"gophers.dev/pkgs/netlog"
 )
 
 const (
@@ -208,11 +209,14 @@ func (s *HTTPServer) ClientAllocRequest(resp http.ResponseWriter, req *http.Requ
 	// tokenize the suffix of the path to get the alloc id and find the action
 	// invoked on the alloc id
 	tokens := strings.Split(reqSuffix, "/")
+	netlog.Yellow("tokens: %v", tokens)
 	if len(tokens) != 2 {
 		return nil, CodedError(404, resourceNotFoundErr)
 	}
 	allocID := tokens[0]
 	switch tokens[1] {
+	case "checks":
+		return s.allocChecks(allocID, resp, req)
 	case "stats":
 		return s.allocStats(allocID, resp, req)
 	case "exec":
@@ -434,6 +438,46 @@ func (s *HTTPServer) allocStats(allocID string, resp http.ResponseWriter, req *h
 	}
 
 	return reply.Stats, rpcErr
+}
+
+func (s *HTTPServer) allocChecks(allocID string, resp http.ResponseWriter, req *http.Request) (any, error) {
+
+	netlog.Yellow("agent.allocChecks, id: %s", allocID)
+	// Build the request and parse the ACL token
+	args := cstructs.AllocChecksRequest{
+		AllocID: allocID,
+	}
+	s.parse(resp, req, &args.QueryOptions.Region, &args.QueryOptions)
+
+	// Determine the handler to use
+	useLocalClient, useClientRPC, useServerRPC := s.rpcHandlerForAlloc(allocID)
+
+	// Make the RPC
+	var reply cstructs.AllocChecksResponse
+	var rpcErr error
+	switch {
+	case useLocalClient:
+		netlog.Yellow("agent.allocChecks useLocalClient")
+		rpcErr = s.agent.Client().ClientRPC(clientChecksRPC, &args, &reply)
+	case useClientRPC:
+		netlog.Yellow("agent.allocChecks useClientRPC")
+		rpcErr = s.agent.Client().RPC(clientChecksRPC, &args, &reply)
+	case useServerRPC:
+		netlog.Yellow("agent.allocChecks useServerRPC")
+		rpcErr = s.agent.Server().RPC(clientChecksRPC, &args, &reply)
+	default:
+		rpcErr = CodedError(400, "No local Node and node_id not provided")
+	}
+
+	if rpcErr != nil {
+		if structs.IsErrNoNodeConn(rpcErr) || structs.IsErrUnknownAllocation(rpcErr) {
+			rpcErr = CodedError(404, rpcErr.Error())
+		}
+	}
+
+	netlog.Yellow("agent.allocChecks, id: %s, len(results): %d, err: %v", allocID, len(reply.Results), rpcErr)
+
+	return reply.Results, rpcErr
 }
 
 func (s *HTTPServer) allocExec(allocID string, resp http.ResponseWriter, req *http.Request) (interface{}, error) {

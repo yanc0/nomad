@@ -17,58 +17,8 @@ import (
 	"oss.indeed.com/go/libtime"
 )
 
-// A Query is derived from a structs.ServiceCheck and contains the minimal
-// amount of information needed to actually execute that check.
-type Query struct {
-	Kind Kind   // readiness or healthiness
-	Type string // tcp or http
-
-	AddressMode string // host, driver, or alloc
-	PortLabel   string // label or value
-
-	Protocol string // http checks only (http or https)
-	Path     string // http checks only
-	Method   string // http checks only
-}
-
-// A QueryContext contains allocation and service parameters necessary for
-// address resolution.
-type QueryContext struct {
-	ID               ID
-	CustomAddress    string
-	ServicePortLabel string
-	Networks         structs.Networks
-	NetworkStatus    structs.NetworkStatus
-	Ports            structs.AllocatedPorts
-}
-
-// GetKind determines whether the check is readiness or healthiness.
-func GetKind(c *structs.ServiceCheck) Kind {
-	if c != nil && c.OnUpdate == "ignore" {
-		return Readiness
-	}
-	return Healthiness
-}
-
-// GetQuery extracts the needed info from c to actually execute the check.
-func GetQuery(c *structs.ServiceCheck) *Query {
-	protocol := "http"
-	if c.Protocol != "" {
-		protocol = c.Protocol
-	}
-	return &Query{
-		Kind:        GetKind(c),
-		Type:        c.Type,
-		AddressMode: c.AddressMode,
-		PortLabel:   c.PortLabel,
-		Path:        c.Path,
-		Method:      c.Method,
-		Protocol:    protocol,
-	}
-}
-
 type Checker interface {
-	Do(*QueryContext, *Query) *QueryResult
+	Do(*QueryContext, *Query) *structs.CheckQueryResult
 }
 
 func New(log hclog.Logger, alloc *structs.Allocation) Checker {
@@ -92,8 +42,8 @@ func (c *checker) now() int64 {
 }
 
 // Do will execute the Query given the QueryContext and produce a QueryResult
-func (c *checker) Do(qc *QueryContext, q *Query) *QueryResult {
-	var qr *QueryResult
+func (c *checker) Do(qc *QueryContext, q *Query) *structs.CheckQueryResult {
+	var qr *structs.CheckQueryResult
 
 	switch q.Type {
 	case "http":
@@ -147,23 +97,23 @@ func address(qc *QueryContext, q *Query) (string, error) {
 	return addr, nil
 }
 
-func (c *checker) checkTCP(qc *QueryContext, q *Query) *QueryResult {
-	qr := &QueryResult{
+func (c *checker) checkTCP(qc *QueryContext, q *Query) *structs.CheckQueryResult {
+	qr := &structs.CheckQueryResult{
 		Kind:      q.Kind,
 		Timestamp: c.now(),
-		Result:    Success,
+		Status:    structs.CheckSuccess,
 	}
 
 	addr, err := address(qc, q)
 	if err != nil {
 		qr.Output = err.Error()
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 		return qr
 	}
 
 	if _, err = net.Dial("tcp", addr); err != nil {
 		qr.Output = err.Error()
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 		return qr
 	}
 
@@ -171,17 +121,17 @@ func (c *checker) checkTCP(qc *QueryContext, q *Query) *QueryResult {
 	return qr
 }
 
-func (c *checker) checkHTTP(qc *QueryContext, q *Query) *QueryResult {
-	qr := &QueryResult{
+func (c *checker) checkHTTP(qc *QueryContext, q *Query) *structs.CheckQueryResult {
+	qr := &structs.CheckQueryResult{
 		Kind:      q.Kind,
 		Timestamp: c.now(),
-		Result:    Pending,
+		Status:    structs.CheckPending,
 	}
 
 	addr, err := address(qc, q)
 	if err != nil {
 		qr.Output = err.Error()
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 		return qr
 	}
 
@@ -194,14 +144,14 @@ func (c *checker) checkHTTP(qc *QueryContext, q *Query) *QueryResult {
 	request, err := http.NewRequest(q.Method, u, nil)
 	if err != nil {
 		qr.Output = fmt.Sprintf("nomad: %s", err.Error())
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 		return qr
 	}
 
 	result, err := c.httpClient.Do(request)
 	if err != nil {
 		qr.Output = fmt.Sprintf("nomad: %s", err.Error())
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 		return qr
 	}
 
@@ -214,9 +164,9 @@ func (c *checker) checkHTTP(qc *QueryContext, q *Query) *QueryResult {
 	}
 
 	if result.StatusCode < 400 {
-		qr.Result = Success
+		qr.Status = structs.CheckSuccess
 	} else {
-		qr.Result = Failure
+		qr.Status = structs.CheckFailure
 	}
 
 	return qr

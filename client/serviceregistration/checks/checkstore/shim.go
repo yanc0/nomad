@@ -4,10 +4,11 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/client/state"
 	"github.com/hashicorp/nomad/helper"
+	"github.com/hashicorp/nomad/nomad/structs"
 	"golang.org/x/exp/slices"
+	"gophers.dev/pkgs/netlog"
 )
 
 // A Shim is used to track the latest check status information, one layer above
@@ -16,15 +17,15 @@ type Shim interface {
 	// Set the latest result for a specific check.
 	Set(
 		allocID string,
-		result *checks.QueryResult,
+		result *structs.CheckQueryResult,
 	) error
 
 	// List the latest results for a specific allocation.
-	List(allocID string) map[checks.ID]*checks.QueryResult
+	List(allocID string) map[structs.CheckID]*structs.CheckQueryResult
 
 	// Keep will reconcile the current set of stored check results with the
 	// list of checkIDs for check results that should be kept.
-	Keep(allocID string, checkIDs []checks.ID) error
+	Keep(allocID string, checkIDs []structs.CheckID) error
 
 	// Purge results for a specific allocation.
 	Purge(allocID string) error
@@ -32,7 +33,7 @@ type Shim interface {
 
 // AllocResultMap is a view of the check_id -> latest result for group and task
 // checks in an allocation.
-type AllocResultMap map[checks.ID]*checks.QueryResult
+type AllocResultMap map[structs.CheckID]*structs.CheckQueryResult
 
 // ClientResultMap is a holistic view of alloc_id -> check_id -> latest result
 // group and task checks across all allocations on a client.
@@ -60,9 +61,10 @@ func NewStore(log hclog.Logger, db state.StateDB) Shim {
 
 func (s *shim) restore() {
 	// todo restore state from db
+	netlog.Red("shim.restore not yet implemented")
 }
 
-func (s *shim) Set(allocID string, qr *checks.QueryResult) error {
+func (s *shim) Set(allocID string, qr *structs.CheckQueryResult) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -74,10 +76,10 @@ func (s *shim) Set(allocID string, qr *checks.QueryResult) error {
 		panic("empty qr id")
 	}
 
-	s.log.Trace("setting check status", "alloc_id", allocID, "check_id", qr.ID, "result", qr.Result)
+	s.log.Trace("setting check status", "alloc_id", allocID, "check_id", qr.ID, "status", qr.Status)
 
 	if _, exists := s.current[allocID]; !exists {
-		s.current[allocID] = make(map[checks.ID]*checks.QueryResult)
+		s.current[allocID] = make(map[structs.CheckID]*structs.CheckQueryResult)
 	}
 
 	s.current[allocID][qr.ID] = qr
@@ -85,7 +87,7 @@ func (s *shim) Set(allocID string, qr *checks.QueryResult) error {
 	return s.db.PutCheckResult(allocID, qr)
 }
 
-func (s *shim) List(allocID string) map[checks.ID]*checks.QueryResult {
+func (s *shim) List(allocID string) map[structs.CheckID]*structs.CheckQueryResult {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -108,12 +110,12 @@ func (s *shim) Purge(allocID string) error {
 	return s.db.PurgeCheckResults(allocID)
 }
 
-func (s *shim) Keep(allocID string, checkIDs []checks.ID) error {
+func (s *shim) Keep(allocID string, checkIDs []structs.CheckID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	// remove from our map and record which ids to remove from persistent store
-	var remove []checks.ID
+	var remove []structs.CheckID
 	for id := range s.current[allocID] {
 		if !slices.Contains(checkIDs, id) {
 			delete(s.current[allocID], id)
