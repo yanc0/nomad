@@ -141,6 +141,9 @@ type Server struct {
 	// rpcServer is the static RPC server that is used by the local agent.
 	rpcServer *rpc.Server
 
+	// rpcRateLimiter maintains the state of RPC request rate limiting
+	rpcRateLimiter *RateLimiter
+
 	// clientRpcAdvertise is the advertised RPC address for Nomad clients to connect
 	// to this server
 	clientRpcAdvertise net.Addr
@@ -1084,6 +1087,7 @@ func (s *Server) setupVaultClient() error {
 func (s *Server) setupRPC(tlsWrap tlsutil.RegionWrapper) error {
 	// Populate the static RPC server
 	s.setupRpcServer(s.rpcServer, nil)
+	s.rpcRateLimiter = newRateLimiter(s.shutdownCtx, s.config.RPCLimits)
 
 	listener, err := s.createRPCListener()
 	if err != nil {
@@ -1159,7 +1163,7 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 		s.staticEndpoints.Status = &Status{srv: s, logger: s.logger.Named("status")}
 		s.staticEndpoints.System = &System{srv: s, logger: s.logger.Named("system")}
 		s.staticEndpoints.Search = &Search{srv: s, logger: s.logger.Named("search")}
-		s.staticEndpoints.Namespace = &Namespace{srv: s, limiter: newRateLimiter("Namespace")}
+		s.staticEndpoints.Namespace = &Namespace{srv: s}
 		s.staticEndpoints.Enterprise = NewEnterpriseEndpoints(s)
 
 		// These endpoints are dynamic because they need access to the

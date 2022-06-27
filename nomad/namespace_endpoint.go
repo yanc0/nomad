@@ -15,15 +15,14 @@ import (
 
 // Namespace endpoint is used for manipulating namespaces
 type Namespace struct {
-	srv     *Server
-	limiter *RateLimiter
+	srv *Server
 }
 
 // UpsertNamespaces is used to upsert a set of namespaces
 func (n *Namespace) UpsertNamespaces(args *structs.NamespaceUpsertRequest,
 	reply *structs.GenericResponse) error {
 
-	if err := n.srv.CheckRateLimit(n.limiter, args.AuthToken, acl.PolicyWrite); err != nil {
+	if err := n.srv.CheckRateLimit("Namespace", args.AuthToken, acl.PolicyWrite); err != nil {
 		return err
 	}
 
@@ -73,7 +72,7 @@ func (n *Namespace) UpsertNamespaces(args *structs.NamespaceUpsertRequest,
 // DeleteNamespaces is used to delete a namespace
 func (n *Namespace) DeleteNamespaces(args *structs.NamespaceDeleteRequest, reply *structs.GenericResponse) error {
 
-	if err := n.srv.CheckRateLimit(n.limiter, args.AuthToken, acl.PolicyWrite); err != nil {
+	if err := n.srv.CheckRateLimit("Namespace", args.AuthToken, acl.PolicyWrite); err != nil {
 		return err
 	}
 
@@ -226,7 +225,7 @@ func (n *Namespace) namespaceTerminalInRegion(authToken, namespace, region strin
 
 // ListNamespaces is used to list the namespaces
 func (n *Namespace) ListNamespaces(args *structs.NamespaceListRequest, reply *structs.NamespaceListResponse) error {
-	if err := n.srv.CheckRateLimit(n.limiter, args.AuthToken, acl.PolicyList); err != nil {
+	if err := n.srv.CheckRateLimit("Namespace", args.AuthToken, acl.PolicyList); err != nil {
 		return err
 	}
 
@@ -291,7 +290,7 @@ func (n *Namespace) ListNamespaces(args *structs.NamespaceListRequest, reply *st
 
 // GetNamespace is used to get a specific namespace
 func (n *Namespace) GetNamespace(args *structs.NamespaceSpecificRequest, reply *structs.SingleNamespaceResponse) error {
-	if err := n.srv.CheckRateLimit(n.limiter, args.AuthToken, acl.PolicyRead); err != nil {
+	if err := n.srv.CheckRateLimit("Namespace", args.AuthToken, acl.PolicyRead); err != nil {
 		return err
 	}
 
@@ -343,7 +342,7 @@ func (n *Namespace) GetNamespace(args *structs.NamespaceSpecificRequest, reply *
 
 // GetNamespaces is used to get a set of namespaces
 func (n *Namespace) GetNamespaces(args *structs.NamespaceSetRequest, reply *structs.NamespaceSetResponse) error {
-	if err := n.srv.CheckRateLimit(n.limiter, args.AuthToken, acl.PolicyRead); err != nil {
+	if err := n.srv.CheckRateLimit("Namespace", args.AuthToken, acl.PolicyRead); err != nil {
 		return err
 	}
 
