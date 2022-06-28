@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -884,22 +885,10 @@ func (c *Client) websocket(endpoint string, q *QueryOptions) (*websocket.Conn, *
 
 	conn, resp, err := dialer.Dial(rhttp.URL.String(), rhttp.Header)
 
-	// check resp status code, as it's more informative than handshake error we get from ws library
+	// check resp status code, as it's more informative than handshake error we
+	// get from ws library
 	if resp != nil && resp.StatusCode != 101 {
-		var buf bytes.Buffer
-
-		if resp.Header.Get("Content-Encoding") == "gzip" {
-			greader, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				return nil, nil, fmt.Errorf("Unexpected response code: %d", resp.StatusCode)
-			}
-			io.Copy(&buf, greader)
-		} else {
-			io.Copy(&buf, resp.Body)
-		}
-		resp.Body.Close()
-
-		return nil, nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		return nil, nil, generateUnexpectedResponseCodeError(resp)
 	}
 
 	return conn, resp, err
@@ -1088,13 +1077,54 @@ func requireOK(d time.Duration, resp *http.Response, e error) (time.Duration, *h
 		}
 		return d, nil, e
 	}
-	if resp.StatusCode != 200 {
-		var buf bytes.Buffer
-		io.Copy(&buf, resp.Body)
-		resp.Body.Close()
-		return d, nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+
+	if resp.StatusCode != http.StatusOK {
+		return d, nil, generateUnexpectedResponseCodeError(resp)
 	}
 	return d, resp, nil
+}
+
+// generateUnexpectedResponseCodeError consumes the rest of the body, closes
+// the body stream and generates an error indicating the status code was
+// unexpected.
+func generateUnexpectedResponseCodeError(resp *http.Response) error {
+
+	var buf bytes.Buffer
+	var err error
+
+	defer closeResponseBody(resp)
+	reader := resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return StatusError{Code: resp.StatusCode, DecodingErr: err}
+		}
+	}
+
+	io.Copy(&buf, reader)
+	trimmed := strings.TrimSpace(buf.String())
+	return StatusError{Code: resp.StatusCode, Body: trimmed}
+}
+
+// closeResponseBody reads resp.Body until EOF, and then closes it. The read
+// is necessary to ensure that the http.Client's underlying RoundTripper is able
+// to re-use the TCP connection. See godoc on net/http.Client.Do.
+func closeResponseBody(resp *http.Response) error {
+	_, _ = io.Copy(ioutil.Discard, resp.Body)
+	return resp.Body.Close()
+}
+
+type StatusError struct {
+	Code        int
+	Body        string
+	DecodingErr error
+}
+
+func (e StatusError) Error() string {
+	if e.DecodingErr != nil {
+		return fmt.Sprintf("Unexpected response code: %d", e.Code)
+	}
+	return fmt.Sprintf("Unexpected response code: %d (%s)", e.Code, e.Body)
 }
 
 // Context returns the context used for canceling HTTP requests related to this query

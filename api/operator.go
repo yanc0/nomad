@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strconv"
@@ -340,8 +339,7 @@ func (op *Operator) LicenseGet(q *QueryOptions) (*LicenseReply, *QueryMeta, erro
 	}
 
 	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, body)
+		return nil, nil, generateUnexpectedResponseCodeError(resp)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&reply)
