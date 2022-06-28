@@ -19,7 +19,11 @@ import (
 // CheckRateLimit finds the appropriate limiter for this endpoint and
 // operation and returns ErrTooManyRequests if the rate limit has been
 // exceeded
-func (srv *Server) CheckRateLimit(endpoint, secretID, op string) error {
+func (srv *Server) CheckRateLimit(endpoint, op, secretID string) error {
+	if !srv.config.ACLEnabled {
+		return nil
+	}
+
 	srv.rpcRateLimiter.lock.RLock()
 	defer srv.rpcRateLimiter.lock.RUnlock()
 
@@ -29,9 +33,9 @@ func (srv *Server) CheckRateLimit(endpoint, secretID, op string) error {
 	}
 	token, err := srv.ResolveSecretToken(secretID)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not resolve rate limit user: %v", err)
 	}
-	return limiter.check(srv.shutdownCtx, token.AccessorID, op)
+	return limiter.check(srv.shutdownCtx, op, token.AccessorID)
 }
 
 // RateLimiter holds all the rate limiting state
@@ -133,6 +137,10 @@ func (r *endpointLimiter) check(ctx context.Context, op, key string) error {
 		tokens, remaining, _, ok, err = r.read.Take(ctx, key)
 	case acl.PolicyList:
 		tokens, remaining, _, ok, err = r.list.Take(ctx, key)
+	default:
+		// this is a programmer error, most likely because we don't
+		// have real enums and it's easy to swap the two strings
+		return fmt.Errorf("no such operation %q", op)
 	}
 	used := tokens - remaining
 	metrics.IncrCounterWithLabels(
@@ -163,8 +171,10 @@ func (r *endpointLimiter) close(ctx context.Context) {
 func newRateLimiterStore(tokens uint64) limiter.Store {
 	// note: the memorystore implementation never returns an error
 	store, _ := memorystore.New(&memorystore.Config{
-		Tokens:   tokens,      // Number of tokens allowed per interval.
-		Interval: time.Minute, // Interval until tokens reset.
+		Tokens:        tokens,
+		Interval:      time.Second,
+		SweepInterval: time.Hour, // how often to clean up stale entries
+		SweepMinTTL:   time.Hour, // how stale entries need to be to clean up
 	})
 	return store
 }
