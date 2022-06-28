@@ -172,7 +172,7 @@ func newRateLimiterStore(tokens uint64) limiter.Store {
 	// note: the memorystore implementation never returns an error
 	store, _ := memorystore.New(&memorystore.Config{
 		Tokens:        tokens,
-		Interval:      time.Second,
+		Interval:      time.Minute,
 		SweepInterval: time.Hour, // how often to clean up stale entries
 		SweepMinTTL:   time.Hour, // how stale entries need to be to clean up
 	})

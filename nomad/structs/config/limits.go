@@ -46,15 +46,15 @@ type Limits struct {
 	RPCMaxConnsPerClient *int `hcl:"rpc_max_conns_per_client"`
 
 	// RPCDefaultWriteRate is the default maximum write RPC requests
-	// per endpoint per user per second. nil/0 means no limit.
+	// per endpoint per user per minute. nil/0 means no limit.
 	RPCDefaultWriteRate *int `hcl:"rpc_default_write_rate"`
 
 	// RPCDefaultReadRate is the default maximum read RPC requests per
-	// endpoint per user per second. nil/0 means no limit.
+	// endpoint per user per minute. nil/0 means no limit.
 	RPCDefaultReadRate *int `hcl:"rpc_default_read_rate"`
 
 	// RPCDefaultListRate is the default maximum list RPC requests per
-	// endpoint per user per second. nil/0 means no limit.
+	// endpoint per user per minute. nil/0 means no limit.
 	RPCDefaultListRate *int `hcl:"rpc_default_list_rate"`
 
 	// These are the RPC limits for individual RPC endpoints
