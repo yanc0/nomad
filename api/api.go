@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,8 +19,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	rootcerts "github.com/hashicorp/go-rootcerts"
+	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-rootcerts"
 )
 
 var (
@@ -990,7 +991,7 @@ func (c *Client) delete(endpoint string, out interface{}, q *WriteOptions) (*Wri
 		return nil, err
 	}
 	r.setWriteOptions(q)
-	rtt, resp, err := requireOK(c.doRequest(r))
+	rtt, resp, err := requireOKOrNoContent(c.doRequest(r))
 	if err != nil {
 		return nil, err
 	}
@@ -1088,13 +1089,60 @@ func requireOK(d time.Duration, resp *http.Response, e error) (time.Duration, *h
 		}
 		return d, nil, e
 	}
-	if resp.StatusCode != 200 {
+
+	if resp.StatusCode != http.StatusOK {
+		return d, nil, generateUnexpectedResponseCodeError(resp)
+	}
+	return d, resp, nil
+}
+
+// requireOKOrNoContent is used to wrap doRequest and check for a 200 or 204
+// Deletes should return 204s if they aren't returning a body.
+func requireOKOrNoContent(d time.Duration, resp *http.Response, e error) (time.Duration, *http.Response, error) {
+	if e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return d, nil, e
+	}
+	if resp.StatusCode != http.StatusOK &&
+		resp.StatusCode != http.StatusNoContent {
+
 		var buf bytes.Buffer
 		io.Copy(&buf, resp.Body)
 		resp.Body.Close()
-		return d, nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		return d, nil, generateUnexpectedResponseCodeError(resp)
 	}
 	return d, resp, nil
+}
+
+// generateUnexpectedResponseCodeError consumes the rest of the body, closes
+// the body stream and generates an error indicating the status code was
+// unexpected.
+func generateUnexpectedResponseCodeError(resp *http.Response) error {
+	var buf bytes.Buffer
+	io.Copy(&buf, resp.Body)
+	closeResponseBody(resp)
+
+	trimmed := strings.TrimSpace(buf.String())
+	return StatusError{Code: resp.StatusCode, Body: trimmed}
+}
+
+// closeResponseBody reads resp.Body until EOF, and then closes it. The read
+// is necessary to ensure that the http.Client's underlying RoundTripper is able
+// to re-use the TCP connection. See godoc on net/http.Client.Do.
+func closeResponseBody(resp *http.Response) error {
+	_, _ = io.Copy(ioutil.Discard, resp.Body)
+	return resp.Body.Close()
+}
+
+type StatusError struct {
+	Code int
+	Body string
+}
+
+func (e StatusError) Error() string {
+	return fmt.Sprintf("Unexpected response code: %d (%s)", e.Code, e.Body)
 }
 
 // Context returns the context used for canceling HTTP requests related to this query
