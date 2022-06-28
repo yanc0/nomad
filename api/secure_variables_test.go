@@ -30,7 +30,7 @@ func TestSecureVariables_SimpleCRUD(t *testing.T) {
 
 		_, err := nsv.Create(&SecureVariable{Path: "bad/var"}, nil)
 		require.Error(t, err)
-		require.EqualError(t, err, "Unexpected response code: 400 (Secure variable missing required Items object.)")
+		require.EqualError(t, err, "Unexpected response code: 400 (secure variable missing required Items object)")
 	})
 
 	t.Run("2 create sv1", func(t *testing.T) {
@@ -171,21 +171,21 @@ func TestSecureVariables_CRUDWithCAS(t *testing.T) {
 	require.NoError(t, err)
 
 	// - try to do an update with sv1's old state; should fail
-	_, err = nsv.Update(sv1, nil)
+	_, err = nsv.CheckedUpdate(sv1, nil)
 	require.Error(t, err)
 
 	// - expect the error to be an ErrCASConflict, so we can cast
 	// to it and retrieve the Conflict value
 	var conflictErr ErrCASConflict
 	require.ErrorAs(t, err, &conflictErr)
-	require.Equal(t, nowVal, conflictErr.conflict)
+	require.Equal(t, nowVal, conflictErr.Conflict)
 
 	// Delete CAS: try to delete sv1 at old ModifyIndex; should
 	// return an ErrCASConflict. Check Conflict.
 	_, err = nsv.CheckedDelete(sv1.Path, sv1.ModifyIndex, nil)
 	require.Error(t, err)
 	require.ErrorAs(t, err, &conflictErr)
-	require.Equal(t, nowVal, conflictErr.conflict)
+	require.Equal(t, nowVal, conflictErr.Conflict)
 
 	// Delete CAS: delete at the current index; should succeed.
 	_, err = nsv.CheckedDelete(nowVal.Path, nowVal.ModifyIndex, nil)

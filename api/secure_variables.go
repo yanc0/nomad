@@ -77,19 +77,12 @@ func (sv *SecureVariables) Update(v *SecureVariable, qo *WriteOptions) (*WriteMe
 // matches the one on the server
 func (sv *SecureVariables) CheckedUpdate(v *SecureVariable, qo *WriteOptions) (*WriteMeta, error) {
 
-	result := new(SecureVariable)
 	v.Path = cleanPathString(v.Path)
-	wm, err := sv.client.write("/v1/var/"+v.Path+"?cas="+fmt.Sprint(v.ModifyIndex), v, result, qo)
+	wm, err := sv.writeChecked("/v1/var/"+v.Path+"?cas="+fmt.Sprint(v.ModifyIndex), v, nil, qo)
 	if err != nil {
 		return nil, err
 	}
 
-	if isConflict(v.ModifyIndex, result) {
-		return nil, ErrCASConflict{
-			cIdx:     v.ModifyIndex,
-			conflict: result,
-		}
-	}
 	return wm, nil
 }
 
@@ -107,28 +100,13 @@ func (sv *SecureVariables) Delete(path string, qo *WriteOptions) (*WriteMeta, er
 // CheckedDelete is used to conditionally delete a secure variable
 func (sv *SecureVariables) CheckedDelete(path string, checkIndex uint64, qo *WriteOptions) (*WriteMeta, error) {
 
-	result := new(SecureVariable)
 	path = cleanPathString(path)
-	wm, err := sv.client.delete(fmt.Sprintf("/v1/var/%s?cas=%v", path, checkIndex), &result, qo)
+	wm, err := sv.deleteChecked(path, checkIndex, qo)
 	if err != nil {
 		return nil, err
 	}
 
-	if isConflict(checkIndex, result) {
-		return nil, ErrCASConflict{
-			cIdx:     checkIndex,
-			conflict: result,
-		}
-	}
 	return wm, nil
-}
-
-func isConflict(checkIndex uint64, conflict *SecureVariable) bool {
-
-	if conflict == nil {
-		return false
-	}
-	return checkIndex != conflict.ModifyIndex
 }
 
 // List is used to dump all of the secure variables, can be used to pass prefix
@@ -194,19 +172,104 @@ func (sv *SecureVariables) readInternal(endpoint string, out **SecureVariable, q
 
 	defer resp.Body.Close()
 	if err := decodeBody(resp, out); err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 
 	return qm, nil
 }
 
-func requireOKOrNotFound(d time.Duration, resp *http.Response, e error) (time.Duration, *http.Response, error) {
+func (sv *SecureVariables) writeChecked(endpoint string, in *SecureVariable, out *SecureVariable, q *WriteOptions) (*WriteMeta, error) {
 
-	fn := func(s int) bool {
-		return s == http.StatusOK || s == http.StatusNotFound
+	r, err := sv.client.newRequest("PUT", endpoint)
+	if err != nil {
+		return nil, err
 	}
-	return requireStatusFn(d, resp, e, fn)
+	r.setWriteOptions(q)
+	r.obj = in
+	rtt, resp, err := requireOKNoContentOrConflict(sv.client.doRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	wm := &WriteMeta{RequestTime: rtt}
+	parseWriteMeta(resp, wm)
+
+	if resp.StatusCode == http.StatusConflict {
+
+		conflict := new(SecureVariable)
+		if err := decodeBody(resp, &conflict); err != nil {
+			return nil, err
+		}
+		return nil, ErrCASConflict{
+			Conflict:   conflict,
+			CheckIndex: in.ModifyIndex,
+		}
+	}
+	return wm, nil
+}
+
+func (sv *SecureVariables) deleteChecked(path string, checkIndex uint64, q *WriteOptions) (*WriteMeta, error) {
+
+	r, err := sv.client.newRequest("DELETE", fmt.Sprintf("/v1/var/%s?cas=%v", path, checkIndex))
+	if err != nil {
+		return nil, err
+	}
+	r.setWriteOptions(q)
+	rtt, resp, err := requireOKNoContentOrConflict(sv.client.doRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	wm := &WriteMeta{RequestTime: rtt}
+	parseWriteMeta(resp, wm)
+
+	// The only reason we should decode the response body is if
+	// it is a conflict response. Otherwise, there won't be one.
+	if resp.StatusCode == http.StatusConflict {
+
+		conflict := new(SecureVariable)
+		if err := decodeBody(resp, &conflict); err != nil {
+			return nil, err
+		}
+		return nil, ErrCASConflict{
+			Conflict:   conflict,
+			CheckIndex: checkIndex,
+		}
+	}
+	return wm, nil
+}
+
+// requireOKOrNotFound is used to wrap doRequest and check for a 200 or 404
+func requireOKOrNotFound(d time.Duration, resp *http.Response, e error) (time.Duration, *http.Response, error) {
+	if e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return d, nil, e
+	}
+	if resp.StatusCode != 200 && resp.StatusCode != 404 {
+		return d, nil, generateUnexpectedResponseCodeError(resp)
+	}
+	return d, resp, nil
+}
+
+// requireOKNoContentOrConflict is used to wrap doRequest and check for a 200, 204, 409
+// The CAS Update function can return a conflict value to be dealt with by the
+// requestor.
+func requireOKNoContentOrConflict(d time.Duration, resp *http.Response, e error) (time.Duration, *http.Response, error) {
+	if e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return d, nil, e
+	}
+	if resp.StatusCode != http.StatusOK &&
+		resp.StatusCode != http.StatusNoContent &&
+		resp.StatusCode != http.StatusConflict {
+
+		return d, nil, generateUnexpectedResponseCodeError(resp)
+	}
+	return d, resp, nil
 }
 
 // SecureVariable specifies the metadata and contents to be stored in the
@@ -288,10 +351,10 @@ func cleanPathString(path string) string {
 }
 
 type ErrCASConflict struct {
-	cIdx     uint64
-	conflict *SecureVariable
+	CheckIndex uint64
+	Conflict   *SecureVariable
 }
 
 func (e ErrCASConflict) Error() string {
-	return fmt.Sprintf("cas conflict: expected ModifyIndex %v; found %v", e.cIdx, e.conflict.ModifyIndex)
+	return fmt.Sprintf("cas conflict: expected ModifyIndex %v; found %v", e.CheckIndex, e.Conflict.ModifyIndex)
 }
