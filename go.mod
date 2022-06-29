@@ -108,6 +108,7 @@ require (
 	github.com/ryanuber/columnize v2.1.1-0.20170703205827-abc90934186a+incompatible
 	github.com/ryanuber/go-glob v1.0.0
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
+	github.com/sethvargo/go-limiter v0.7.2
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/shoenig/test v0.2.6
 	github.com/skratchdot/open-golang v0.0.0-20160302144031-75fb7ed4208c
@@ -244,7 +245,6 @@ require (
 	github.com/renier/xmlrpc v0.0.0-20170708154548-ce4a1a486c03 // indirect
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/seccomp/libseccomp-golang v0.9.2-0.20210429002308-3879420cc921 // indirect
-	github.com/sethvargo/go-limiter v0.7.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/softlayer/softlayer-go v0.0.0-20180806151055-260589d94c7d // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
