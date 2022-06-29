@@ -23,9 +23,10 @@ type Status struct {
 
 // Ping is used to just check for connectivity
 func (s *Status) Ping(args struct{}, reply *struct{}) error {
-	rateLimitToken := s.ctx.NodeID
-	if err := s.srv.CheckRateLimit("Status", acl.PolicyRead, rateLimitToken); err != nil {
-		return err
+	if s.ctx != nil {
+		if err := s.srv.CheckRateLimit("Status", acl.PolicyRead, s.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -142,8 +143,10 @@ func (s *Status) RaftStats(args struct{}, reply *autopilot.ServerStats) error {
 // HasNodeConn returns whether the server has a connection to the requested
 // Node.
 func (s *Status) HasNodeConn(args *structs.NodeSpecificRequest, reply *structs.NodeConnQueryResponse) error {
-	if err := s.srv.CheckRateLimit("Status", acl.PolicyRead, s.ctx.NodeID); err != nil {
-		return err
+	if s.ctx != nil {
+		if err := s.srv.CheckRateLimit("Status", acl.PolicyRead, s.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Validate the args

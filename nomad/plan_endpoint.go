@@ -22,8 +22,10 @@ type Plan struct {
 
 // Submit is used to submit a plan to the leader
 func (p *Plan) Submit(args *structs.PlanRequest, reply *structs.PlanResponse) error {
-	if err := p.srv.CheckRateLimit("Plan", acl.PolicyWrite, p.ctx.NodeID); err != nil {
-		return err
+	if p.ctx != nil {
+		if err := p.srv.CheckRateLimit("Plan", acl.PolicyWrite, p.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.

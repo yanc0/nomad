@@ -573,8 +573,10 @@ func (d *Deployment) Allocations(args *structs.DeploymentSpecificRequest, reply 
 // Reap is used to cleanup terminal deployments
 func (d *Deployment) Reap(args *structs.DeploymentDeleteRequest,
 	reply *structs.GenericResponse) error {
-	if err := d.srv.CheckRateLimit("Deployment", acl.PolicyWrite, d.ctx.NodeID); err != nil {
-		return err
+	if d.ctx != nil {
+		if err := d.srv.CheckRateLimit("Deployment", acl.PolicyWrite, d.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.

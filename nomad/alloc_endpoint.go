@@ -224,8 +224,10 @@ func (a *Alloc) GetAlloc(args *structs.AllocSpecificRequest,
 // GetAllocs is used to lookup a set of allocations
 func (a *Alloc) GetAllocs(args *structs.AllocsGetRequest,
 	reply *structs.AllocsGetResponse) error {
-	if err := a.srv.CheckRateLimit("Alloc", acl.PolicyRead, a.ctx.NodeID); err != nil {
-		return err
+	if a.ctx != nil {
+		if err := a.srv.CheckRateLimit("Alloc", acl.PolicyRead, a.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by a client if TLS is used.

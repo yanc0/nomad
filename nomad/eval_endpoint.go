@@ -107,8 +107,10 @@ func (e *Eval) GetEval(args *structs.EvalSpecificRequest,
 // Dequeue is used to dequeue a pending evaluation
 func (e *Eval) Dequeue(args *structs.EvalDequeueRequest,
 	reply *structs.EvalDequeueResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -202,8 +204,10 @@ func (e *Eval) getWaitIndex(namespace, job string, evalModifyIndex uint64) (uint
 // Ack is used to acknowledge completion of a dequeued evaluation
 func (e *Eval) Ack(args *structs.EvalAckRequest,
 	reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -227,8 +231,10 @@ func (e *Eval) Ack(args *structs.EvalAckRequest,
 // Nack is used to negative acknowledge completion of a dequeued evaluation.
 func (e *Eval) Nack(args *structs.EvalAckRequest,
 	reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -252,8 +258,10 @@ func (e *Eval) Nack(args *structs.EvalAckRequest,
 // Update is used to perform an update of an Eval if it is outstanding.
 func (e *Eval) Update(args *structs.EvalUpdateRequest,
 	reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -292,8 +300,10 @@ func (e *Eval) Update(args *structs.EvalUpdateRequest,
 // Create is used to make a new evaluation
 func (e *Eval) Create(args *structs.EvalUpdateRequest,
 	reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -347,8 +357,10 @@ func (e *Eval) Create(args *structs.EvalUpdateRequest,
 // Reblock is used to reinsert an existing blocked evaluation into the blocked
 // evaluation tracker.
 func (e *Eval) Reblock(args *structs.EvalUpdateRequest, reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.
@@ -399,8 +411,10 @@ func (e *Eval) Reblock(args *structs.EvalUpdateRequest, reply *structs.GenericRe
 // Reap is used to cleanup dead evaluations and allocations
 func (e *Eval) Reap(args *structs.EvalDeleteRequest,
 	reply *structs.GenericResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-		return err
+	if e.ctx != nil {
+		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by another server if TLS is used.

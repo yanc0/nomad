@@ -29,8 +29,10 @@ type ServiceRegistration struct {
 func (s *ServiceRegistration) Upsert(
 	args *structs.ServiceRegistrationUpsertRequest,
 	reply *structs.ServiceRegistrationUpsertResponse) error {
-	if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyWrite, s.ctx.NodeID); err != nil {
-		return err
+	if s.ctx != nil {
+		if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyWrite, s.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	// Ensure the connection was initiated by a client if TLS is used.
@@ -92,8 +94,10 @@ func (s *ServiceRegistration) Upsert(
 func (s *ServiceRegistration) DeleteByID(
 	args *structs.ServiceRegistrationDeleteByIDRequest,
 	reply *structs.ServiceRegistrationDeleteByIDResponse) error {
-	if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyWrite, s.ctx.NodeID); err != nil {
-		return err
+	if s.ctx != nil {
+		if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyWrite, s.ctx.NodeID); err != nil {
+			return err
+		}
 	}
 
 	if done, err := s.srv.forward(structs.ServiceRegistrationDeleteByIDRPCMethod, args, args, reply); done {
@@ -162,7 +166,7 @@ func (s *ServiceRegistration) List(
 	reply *structs.ServiceRegistrationListResponse) error {
 
 	rateLimitToken := args.AuthToken
-	if rateLimitToken == "" {
+	if rateLimitToken == "" && s.ctx != nil {
 		rateLimitToken = s.ctx.NodeID
 	}
 	if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyList, rateLimitToken); err != nil {
@@ -383,7 +387,7 @@ func (s *ServiceRegistration) GetService(
 	args *structs.ServiceRegistrationByNameRequest,
 	reply *structs.ServiceRegistrationByNameResponse) error {
 	rateLimitToken := args.AuthToken
-	if rateLimitToken == "" {
+	if rateLimitToken == "" && s.ctx != nil {
 		rateLimitToken = s.ctx.NodeID
 	}
 	if err := s.srv.CheckRateLimit("ServiceRegistration", acl.PolicyRead, rateLimitToken); err != nil {
