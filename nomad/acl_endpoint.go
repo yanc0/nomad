@@ -12,6 +12,7 @@ import (
 	metrics "github.com/armon/go-metrics"
 	log "github.com/hashicorp/go-hclog"
 	memdb "github.com/hashicorp/go-memdb"
+	"github.com/hashicorp/nomad/acl"
 	policy "github.com/hashicorp/nomad/acl"
 	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/helper/uuid"
@@ -39,6 +40,10 @@ type ACL struct {
 
 // UpsertPolicies is used to create or update a set of policies
 func (a *ACL) UpsertPolicies(args *structs.ACLPolicyUpsertRequest, reply *structs.GenericResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
@@ -83,6 +88,10 @@ func (a *ACL) UpsertPolicies(args *structs.ACLPolicyUpsertRequest, reply *struct
 
 // DeletePolicies is used to delete policies
 func (a *ACL) DeletePolicies(args *structs.ACLPolicyDeleteRequest, reply *structs.GenericResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
@@ -119,6 +128,10 @@ func (a *ACL) DeletePolicies(args *structs.ACLPolicyDeleteRequest, reply *struct
 
 // ListPolicies is used to list the policies
 func (a *ACL) ListPolicies(args *structs.ACLPolicyListRequest, reply *structs.ACLPolicyListResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyList, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -203,6 +216,10 @@ func (a *ACL) ListPolicies(args *structs.ACLPolicyListRequest, reply *structs.AC
 
 // GetPolicy is used to get a specific policy
 func (a *ACL) GetPolicy(args *structs.ACLPolicySpecificRequest, reply *structs.SingleACLPolicyResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -294,6 +311,10 @@ func (a *ACL) requestACLToken(secretID string) (*structs.ACLToken, error) {
 
 // GetPolicies is used to get a set of policies
 func (a *ACL) GetPolicies(args *structs.ACLPolicySetRequest, reply *structs.ACLPolicySetResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -349,6 +370,10 @@ func (a *ACL) GetPolicies(args *structs.ACLPolicySetRequest, reply *structs.ACLP
 
 // Bootstrap is used to bootstrap the initial token
 func (a *ACL) Bootstrap(args *structs.ACLTokenBootstrapRequest, reply *structs.ACLTokenUpsertResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
@@ -461,6 +486,10 @@ func (a *ACL) fileBootstrapResetIndex() uint64 {
 
 // UpsertTokens is used to create or update a set of tokens
 func (a *ACL) UpsertTokens(args *structs.ACLTokenUpsertRequest, reply *structs.ACLTokenUpsertResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
@@ -570,6 +599,10 @@ func (a *ACL) UpsertTokens(args *structs.ACLTokenUpsertRequest, reply *structs.A
 
 // DeleteTokens is used to delete tokens
 func (a *ACL) DeleteTokens(args *structs.ACLTokenDeleteRequest, reply *structs.GenericResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
@@ -650,6 +683,10 @@ func (a *ACL) DeleteTokens(args *structs.ACLTokenDeleteRequest, reply *structs.G
 
 // ListTokens is used to list the tokens
 func (a *ACL) ListTokens(args *structs.ACLTokenListRequest, reply *structs.ACLTokenListResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyList, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -734,6 +771,10 @@ func (a *ACL) ListTokens(args *structs.ACLTokenListRequest, reply *structs.ACLTo
 
 // GetToken is used to get a specific token
 func (a *ACL) GetToken(args *structs.ACLTokenSpecificRequest, reply *structs.SingleACLTokenResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -795,6 +836,10 @@ func (a *ACL) GetToken(args *structs.ACLTokenSpecificRequest, reply *structs.Sin
 
 // GetTokens is used to get a set of token
 func (a *ACL) GetTokens(args *structs.ACLTokenSetRequest, reply *structs.ACLTokenSetResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -842,6 +887,10 @@ func (a *ACL) GetTokens(args *structs.ACLTokenSetRequest, reply *structs.ACLToke
 
 // ResolveToken is used to lookup a specific token by a secret ID. This is used for enforcing ACLs by clients.
 func (a *ACL) ResolveToken(args *structs.ResolveACLTokenRequest, reply *structs.ResolveACLTokenResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -881,6 +930,10 @@ func (a *ACL) ResolveToken(args *structs.ResolveACLTokenRequest, reply *structs.
 }
 
 func (a *ACL) UpsertOneTimeToken(args *structs.OneTimeTokenUpsertRequest, reply *structs.OneTimeTokenUpsertResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -933,6 +986,10 @@ func (a *ACL) UpsertOneTimeToken(args *structs.OneTimeTokenUpsertRequest, reply 
 // ExchangeOneTimeToken provides a one-time token's secret ID to exchange it
 // for the ACL token that created that one-time token
 func (a *ACL) ExchangeOneTimeToken(args *structs.OneTimeTokenExchangeRequest, reply *structs.OneTimeTokenExchangeResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
+
 	if !a.srv.config.ACLEnabled {
 		return aclDisabled
 	}
@@ -992,6 +1049,9 @@ func (a *ACL) ExchangeOneTimeToken(args *structs.OneTimeTokenExchangeRequest, re
 // ExpireOneTimeTokens removes all expired tokens from the state store. It is
 // called only by garbage collection
 func (a *ACL) ExpireOneTimeTokens(args *structs.OneTimeTokenExpireRequest, reply *structs.GenericResponse) error {
+	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+		return err
+	}
 
 	if done, err := a.srv.forward(
 		"ACL.ExpireOneTimeTokens", args, args, reply); done {

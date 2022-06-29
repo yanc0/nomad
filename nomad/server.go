@@ -1160,7 +1160,6 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 		s.staticEndpoints.Periodic = &Periodic{srv: s, logger: s.logger.Named("periodic")}
 		s.staticEndpoints.Region = &Region{srv: s, logger: s.logger.Named("region")}
 		s.staticEndpoints.Scaling = &Scaling{srv: s, logger: s.logger.Named("scaling")}
-		s.staticEndpoints.Status = &Status{srv: s, logger: s.logger.Named("status")}
 		s.staticEndpoints.System = &System{srv: s, logger: s.logger.Named("system")}
 		s.staticEndpoints.Search = &Search{srv: s, logger: s.logger.Named("search")}
 		s.staticEndpoints.Namespace = &Namespace{srv: s}
@@ -1173,6 +1172,7 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 		s.staticEndpoints.Deployment = &Deployment{srv: s, logger: s.logger.Named("deployment")}
 		s.staticEndpoints.Node = &Node{srv: s, logger: s.logger.Named("client")}
 		s.staticEndpoints.ServiceRegistration = &ServiceRegistration{srv: s}
+		s.staticEndpoints.Status = &Status{srv: s, logger: s.logger.Named("status")}
 
 		// Client endpoints
 		s.staticEndpoints.ClientStats = &ClientStats{srv: s, logger: s.logger.Named("client_stats")}
@@ -1201,7 +1201,6 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 	server.Register(s.staticEndpoints.Periodic)
 	server.Register(s.staticEndpoints.Region)
 	server.Register(s.staticEndpoints.Scaling)
-	server.Register(s.staticEndpoints.Status)
 	server.Register(s.staticEndpoints.System)
 	server.Register(s.staticEndpoints.Search)
 	s.staticEndpoints.Enterprise.Register(server)
@@ -1219,6 +1218,7 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 	node := &Node{srv: s, ctx: ctx, logger: s.logger.Named("client")}
 	plan := &Plan{srv: s, ctx: ctx, logger: s.logger.Named("plan")}
 	serviceReg := &ServiceRegistration{srv: s, ctx: ctx}
+	status := &Status{srv: s, ctx: ctx}
 
 	// Register the dynamic endpoints
 	server.Register(alloc)
@@ -1226,7 +1226,8 @@ func (s *Server) setupRpcServer(server *rpc.Server, ctx *RPCContext) {
 	server.Register(eval)
 	server.Register(node)
 	server.Register(plan)
-	_ = server.Register(serviceReg)
+	server.Register(serviceReg)
+	server.Register(status)
 }
 
 // setupRaft is used to setup and initialize Raft

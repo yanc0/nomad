@@ -58,9 +58,28 @@ type Limits struct {
 	RPCDefaultListRate *int `hcl:"rpc_default_list_rate"`
 
 	// These are the RPC limits for individual RPC endpoints
-	Namespace *RPCEndpointLimits `hcl:"namespace"`
-	Job       *RPCEndpointLimits `hcl:"job"`
-	// TODO, etc...
+	ACL                 *RPCEndpointLimits `hcl:"acl"`
+	Alloc               *RPCEndpointLimits `hcl:"alloc"`
+	CSIPlugin           *RPCEndpointLimits `hcl:"csi_plugin"`
+	CSIVolume           *RPCEndpointLimits `hcl:"csi_volume"`
+	Deployment          *RPCEndpointLimits `hcl:"deployment"`
+	Eval                *RPCEndpointLimits `hcl:"eval"`
+	Job                 *RPCEndpointLimits `hcl:"job"`
+	Namespace           *RPCEndpointLimits `hcl:"namespace"`
+	Operator            *RPCEndpointLimits `hcl:"operator"`
+	Node                *RPCEndpointLimits `hcl:"node"`
+	Periodic            *RPCEndpointLimits `hcl:"periodic"`
+	Plan                *RPCEndpointLimits `hcl:"plan"`
+	Regions             *RPCEndpointLimits `hcl:"regions"`
+	Scaling             *RPCEndpointLimits `hcl:"scaling"`
+	Search              *RPCEndpointLimits `hcl:"search"`
+	ServiceRegistration *RPCEndpointLimits `hcl:"service_registration"`
+	Status              *RPCEndpointLimits `hcl:"status"`
+	System              *RPCEndpointLimits `hcl:"system"`
+
+	// TODO: need to figure out how this will work with streaming endpoints
+	// Event               *RPCEndpointLimits `hcl:"event"`
+
 }
 
 // DefaultLimits returns the default limits values. User settings should be

@@ -21,7 +21,6 @@ type Namespace struct {
 // UpsertNamespaces is used to upsert a set of namespaces
 func (n *Namespace) UpsertNamespaces(args *structs.NamespaceUpsertRequest,
 	reply *structs.GenericResponse) error {
-
 	if err := n.srv.CheckRateLimit("Namespace", acl.PolicyWrite, args.AuthToken); err != nil {
 		return err
 	}
@@ -71,7 +70,6 @@ func (n *Namespace) UpsertNamespaces(args *structs.NamespaceUpsertRequest,
 
 // DeleteNamespaces is used to delete a namespace
 func (n *Namespace) DeleteNamespaces(args *structs.NamespaceDeleteRequest, reply *structs.GenericResponse) error {
-
 	if err := n.srv.CheckRateLimit("Namespace", acl.PolicyWrite, args.AuthToken); err != nil {
 		return err
 	}

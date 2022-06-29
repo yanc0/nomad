@@ -50,14 +50,29 @@ func newRateLimiter(shutdownCtx context.Context, cfg *config.Limits) *RateLimite
 		shutdownCtx: shutdownCtx,
 		limiters:    map[string]*endpointLimiter{},
 	}
-
 	if cfg == nil {
-		rl.limiters["Namespace"] = defaultEndpointLimiter("namespace")
-		rl.limiters["Job"] = defaultEndpointLimiter("job")
-	} else {
-		rl.limiters["Namespace"] = newEndpointLimiter("namespace", cfg.Namespace, *cfg)
-		rl.limiters["Job"] = newEndpointLimiter("job", cfg.Job, *cfg)
+		cfg = &config.Limits{}
 	}
+
+	rl.limiters["ACL"] = newEndpointLimiter("acl", cfg.ACL, *cfg)
+	rl.limiters["Alloc"] = newEndpointLimiter("alloc", cfg.Alloc, *cfg)
+	rl.limiters["CSIPlugin"] = newEndpointLimiter("csi_plugin", cfg.CSIPlugin, *cfg)
+	rl.limiters["CSIVolume"] = newEndpointLimiter("csi_volume", cfg.CSIVolume, *cfg)
+	rl.limiters["Deployment"] = newEndpointLimiter("deployment", cfg.Deployment, *cfg)
+	rl.limiters["Eval"] = newEndpointLimiter("eval", cfg.Eval, *cfg)
+	rl.limiters["Job"] = newEndpointLimiter("job", cfg.Job, *cfg)
+	rl.limiters["Namespace"] = newEndpointLimiter("namespace", cfg.Namespace, *cfg)
+	rl.limiters["Operator"] = newEndpointLimiter("operator", cfg.Operator, *cfg)
+	rl.limiters["Node"] = newEndpointLimiter("node", cfg.Node, *cfg)
+	rl.limiters["Periodic"] = newEndpointLimiter("periodic", cfg.Periodic, *cfg)
+	rl.limiters["Plan"] = newEndpointLimiter("plan", cfg.Plan, *cfg)
+	rl.limiters["Regions"] = newEndpointLimiter("regions", cfg.Regions, *cfg)
+	rl.limiters["Scaling"] = newEndpointLimiter("scaling", cfg.Scaling, *cfg)
+	rl.limiters["Search"] = newEndpointLimiter("search", cfg.Search, *cfg)
+	rl.limiters["ServiceRegistration"] = newEndpointLimiter(
+		"service_registration", cfg.ServiceRegistration, *cfg)
+	rl.limiters["Status"] = newEndpointLimiter("status", cfg.Status, *cfg)
+	rl.limiters["System"] = newEndpointLimiter("system", cfg.System, *cfg)
 
 	go func() {
 		<-shutdownCtx.Done()
@@ -86,16 +101,6 @@ type endpointLimiter struct {
 	write    limiter.Store
 	read     limiter.Store
 	list     limiter.Store
-}
-
-func defaultEndpointLimiter(endpoint string) *endpointLimiter {
-	return &endpointLimiter{
-		endpoint: endpoint,
-		write:    newRateLimiterStore(math.MaxUint64),
-		read:     newRateLimiterStore(math.MaxUint64),
-		list:     newRateLimiterStore(math.MaxUint64),
-	}
-
 }
 
 func newEndpointLimiter(endpoint string, limits *config.RPCEndpointLimits, defaults config.Limits) *endpointLimiter {

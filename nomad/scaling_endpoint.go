@@ -22,6 +22,9 @@ type Scaling struct {
 
 // ListPolicies is used to list the policies
 func (p *Scaling) ListPolicies(args *structs.ScalingPolicyListRequest, reply *structs.ScalingPolicyListResponse) error {
+	if err := p.srv.CheckRateLimit("Scaling", acl.PolicyList, args.AuthToken); err != nil {
+		return err
+	}
 
 	if done, err := p.srv.forward("Scaling.ListPolicies", args, args, reply); done {
 		return err
@@ -89,6 +92,9 @@ func (p *Scaling) ListPolicies(args *structs.ScalingPolicyListRequest, reply *st
 // GetPolicy is used to get a specific policy
 func (p *Scaling) GetPolicy(args *structs.ScalingPolicySpecificRequest,
 	reply *structs.SingleScalingPolicyResponse) error {
+	if err := p.srv.CheckRateLimit("Scaling", acl.PolicyRead, args.AuthToken); err != nil {
+		return err
+	}
 
 	if done, err := p.srv.forward("Scaling.GetPolicy", args, args, reply); done {
 		return err
