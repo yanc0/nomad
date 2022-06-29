@@ -1,7 +1,6 @@
 package structs
 
 import (
-	"crypto/md5"
 	"fmt"
 )
 
@@ -31,8 +30,8 @@ func GetCheckMode(c *ServiceCheck) CheckMode {
 // An CheckID is unique to a check.
 type CheckID string
 
-func (k CheckMode) String() string {
-	switch k {
+func (c CheckMode) String() string {
+	switch c {
 	case Readiness:
 		return "readiness"
 	default:
@@ -53,8 +52,8 @@ type CheckQueryResult struct {
 	Timestamp int64
 }
 
-func (qr *CheckQueryResult) String() string {
-	return fmt.Sprintf("(%s %s %s %v)", qr.ID, qr.Kind, qr.Status, qr.Timestamp)
+func (r *CheckQueryResult) String() string {
+	return fmt.Sprintf("(%s %s %s %v)", r.ID, r.Kind, r.Status, r.Timestamp)
 }
 
 // A CheckStatus is resultant detected status of a check upon executing it. The
@@ -67,8 +66,8 @@ const (
 	CheckPending
 )
 
-func (r CheckStatus) String() string {
-	switch r {
+func (s CheckStatus) String() string {
+	switch s {
 	case CheckSuccess:
 		return "success"
 	case CheckFailure:
@@ -82,13 +81,11 @@ func (r CheckStatus) String() string {
 //
 // Checks of group-level services have no task.
 func MakeCheckID(allocID, group, task, name string) CheckID {
-	sum := md5.New()
-	_, _ = sum.Write([]byte(allocID))
-	_, _ = sum.Write([]byte(group))
-	_, _ = sum.Write([]byte(task))
-	_, _ = sum.Write([]byte(name))
-	h := sum.Sum(nil)
-	return CheckID(fmt.Sprintf("%x", h))
+	id := allocID[0:8]
+	if task == "" {
+		return CheckID(fmt.Sprintf("chk_%s_%s_%s", group, name, id))
+	}
+	return CheckID(fmt.Sprintf("chk_%s_%s_%s_%s", group, task, name, id))
 }
 
 // server only, to proxy to client

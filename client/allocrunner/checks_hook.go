@@ -99,7 +99,7 @@ func newChecksHook(
 }
 
 // initialize the dynamic fields of checksHook, which is to say setup all the
-// observers and query context things associated with alloc.
+// observers and query context things associated with the alloc.
 //
 // Should be called during initial setup and on allocation updates.
 func (h *checksHook) initialize(alloc *structs.Allocation) {
