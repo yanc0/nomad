@@ -6295,6 +6295,25 @@ func (tg *TaskGroup) Canonicalize(job *Job) {
 	}
 }
 
+// NomadServices returns a list of all group and task - level services in tg that
+// are making use of the nomad service provider.
+func (tg *TaskGroup) NomadServices() []*Service {
+	var services []*Service
+	for _, service := range tg.Services {
+		if service.Provider == ServiceProviderNomad {
+			services = append(services, service)
+		}
+	}
+	for _, task := range tg.Tasks {
+		for _, service := range task.Services {
+			if service.Provider == ServiceProviderNomad {
+				services = append(services, service)
+			}
+		}
+	}
+	return services
+}
+
 // Validate is used to check a task group for reasonable configuration
 func (tg *TaskGroup) Validate(j *Job) error {
 	var mErr multierror.Error

@@ -82,7 +82,7 @@ func (s CheckStatus) String() string {
 // Checks of group-level services have no task.
 func MakeCheckID(allocID, group, task, name string) CheckID {
 	id := allocID[0:8]
-	if task == "" {
+	if task == "" || task == "group" {
 		return CheckID(fmt.Sprintf("chk_%s_%s_%s", group, name, id))
 	}
 	return CheckID(fmt.Sprintf("chk_%s_%s_%s_%s", group, task, name, id))

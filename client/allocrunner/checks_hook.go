@@ -27,6 +27,7 @@ type observers map[structs.CheckID]*observer
 // check store with those results.
 type observer struct {
 	ctx     context.Context
+	cancel  context.CancelFunc
 	shim    checkstore.Shim
 	checker checks.Checker
 
@@ -36,7 +37,8 @@ type observer struct {
 }
 
 func (o *observer) start() {
-	timer, cancel := helper.NewSafeTimer(0)
+	firstWait := o.check.Interval / 2 // compromise between too early and waiting full interval
+	timer, cancel := helper.NewSafeTimer(firstWait)
 	defer cancel()
 
 	netlog.Cyan("observer started for check: %s", o.check.Name)
@@ -63,6 +65,10 @@ func (o *observer) start() {
 	}
 }
 
+func (o *observer) stop() {
+	o.cancel()
+}
+
 // checksHook manages checks of Nomad service registrations, at both the group and
 // task level, by storing / removing them from the Client state store.
 //
@@ -79,6 +85,7 @@ type checksHook struct {
 	ctx       context.Context
 	stop      func()
 	observers observers
+	alloc     *structs.Allocation
 }
 
 func newChecksHook(
@@ -90,6 +97,7 @@ func newChecksHook(
 	h := &checksHook{
 		logger:  logger.Named(checksHookName),
 		allocID: alloc.ID,
+		alloc:   alloc,
 		shim:    shim,
 		network: network,
 		checker: checks.New(logger, alloc),
@@ -101,7 +109,7 @@ func newChecksHook(
 // initialize the dynamic fields of checksHook, which is to say setup all the
 // observers and query context things associated with the alloc.
 //
-// Should be called during initial setup and on allocation updates.
+// Should be called during initial setup only.
 func (h *checksHook) initialize(alloc *structs.Allocation) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -117,6 +125,15 @@ func (h *checksHook) initialize(alloc *structs.Allocation) {
 	// fresh set of observers
 	h.observers = make(observers)
 
+	// set the current alloc
+	h.alloc = alloc
+}
+
+// observe will create the observer for each service in services.
+// services must use only nomad service provider.
+//
+// Caller must hold h.lock.
+func (h *checksHook) observe(alloc *structs.Allocation, services []*structs.Service) {
 	var ports structs.AllocatedPorts
 	var networks structs.Networks
 	if alloc.AllocatedResources != nil {
@@ -124,41 +141,55 @@ func (h *checksHook) initialize(alloc *structs.Allocation) {
 		networks = alloc.AllocatedResources.Shared.Networks
 	}
 
-	netlog.Purple("ports:", ports)
-	netlog.Purple("networks:", networks)
+	for _, service := range services {
+		for _, check := range service.Checks {
 
-	setup := func(name string, services []*structs.Service) {
-		for _, service := range services {
-			if service.Provider != structs.ServiceProviderNomad {
+			// remember the initialization time
+			now := time.Now().UTC().Unix()
+
+			// create the deterministic check id for this check
+			id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, check.TaskName, check.Name)
+
+			netlog.Purple("observe %s : %s : %s", service.Name, check.Name, id)
+
+			// an observer for this check already exists
+			if _, exists := h.observers[id]; exists {
+				netlog.Purple(" -> already exists")
 				continue
 			}
-			for _, check := range service.Checks {
-				id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, name, check.Name)
-				h.observers[id] = &observer{
-					ctx:     h.ctx,
-					check:   check.Copy(),
-					shim:    h.shim,
-					checker: h.checker,
-					allocID: h.allocID,
-					qc: &checks.QueryContext{
-						ID:               id,
-						CustomAddress:    service.Address,
-						ServicePortLabel: service.PortLabel,
-						Ports:            ports,
-						Networks:         networks,
-						NetworkStatus:    h.network,
-					},
-				}
+
+			ctx, cancel := context.WithCancel(h.ctx)
+
+			// create the observer for this check
+			h.observers[id] = &observer{
+				ctx:     ctx,
+				cancel:  cancel,
+				check:   check.Copy(),
+				shim:    h.shim,
+				checker: h.checker,
+				allocID: h.allocID,
+				qc: &checks.QueryContext{
+					ID:               id,
+					CustomAddress:    service.Address,
+					ServicePortLabel: service.PortLabel,
+					Ports:            ports,
+					Networks:         networks,
+					NetworkStatus:    h.network,
+				},
 			}
+
+			netlog.Purple(" -> create observer")
+
+			// insert a pending result into state store for each check
+			result := checks.Stub(id, structs.GetCheckMode(check), now)
+			if err := h.shim.Set(h.allocID, result); err != nil {
+				h.logger.Error("failed to set initial check status", "id", h.allocID, "error", err)
+				continue
+			}
+
+			// start the observer
+			go h.observers[id].start()
 		}
-	}
-
-	// init for nomad group services
-	setup("group", tg.Services)
-
-	// init for nomad task services
-	for _, task := range tg.Tasks {
-		setup(task.Name, task.Services)
 	}
 }
 
@@ -170,36 +201,71 @@ func (h *checksHook) Prerun() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	now := time.Now().UTC().Unix()
-	netlog.Yellow("ch.PreRun, now: %v", now)
-
-	// insert a pending result into state store for each check
-	for _, obs := range h.observers {
-		result := checks.Stub(obs.qc.ID, structs.GetCheckMode(obs.check), now)
-		if err := h.shim.Set(h.allocID, result); err != nil {
-			return err
-		}
+	group := h.alloc.Job.LookupTaskGroup(h.alloc.TaskGroup)
+	if group == nil {
+		return nil
 	}
 
-	// start the observers
-	for _, obs := range h.observers {
-		go obs.start()
-	}
+	// create and start observers of nomad service checks in alloc
+	h.observe(h.alloc, group.NomadServices())
 
 	return nil
 }
 
 func (h *checksHook) Update(request *interfaces.RunnerUpdateRequest) error {
-	netlog.Yellow("checksHook.Update, id: %s", request.Alloc.ID)
+	h.lock.Lock()
+	defer h.lock.Unlock()
 
-	netlog.Yellow("ch.Update: issue stop")
+	netlog.Purple("checksHook.Update, id: %s", request.Alloc.ID)
 
-	// todo: need to reconcile check store, may be checks to remove
+	group := request.Alloc.Job.LookupTaskGroup(request.Alloc.TaskGroup)
+	if group == nil {
+		return nil
+	}
+
+	// get all group and task level services using nomad provider
+	services := group.NomadServices()
+
+	// create a set of the updated set of checks
+	next := make([]structs.CheckID, 0, len(h.observers))
+	for _, service := range services {
+		for _, check := range service.Checks {
+			next = append(next, structs.MakeCheckID(
+				request.Alloc.ID,
+				request.Alloc.TaskGroup,
+				service.TaskName,
+				check.Name,
+			))
+		}
+	}
+	netlog.Purple("ch.Update next: %v", next)
+
+	// stop the observers of the checks we are removing
+	remove := h.shim.Unwanted(request.Alloc.ID, next)
+	for _, id := range remove {
+		h.observers[id].stop()
+		delete(h.observers, id)
+	}
+
+	// purge checks that are no longer part of the allocation
+	err := h.shim.Keep(request.Alloc.ID, next)
+	if err != nil {
+		return err
+	}
+
+	// remember this new alloc
+	h.alloc = request.Alloc
+
+	// ensure we are observing new checks (idempotent)
+	h.observe(request.Alloc, services)
 
 	return nil
 }
 
 func (h *checksHook) PreKill() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	netlog.Yellow("ch.PreKill")
 
 	// terminate the background thing

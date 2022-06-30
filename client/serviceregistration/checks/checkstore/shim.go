@@ -15,17 +15,17 @@ import (
 // the client persistent store so we can do efficient indexing, etc.
 type Shim interface {
 	// Set the latest result for a specific check.
-	Set(
-		allocID string,
-		result *structs.CheckQueryResult,
-	) error
+	Set(allocID string, result *structs.CheckQueryResult) error
 
 	// List the latest results for a specific allocation.
 	List(allocID string) map[structs.CheckID]*structs.CheckQueryResult
 
+	// Unwanted returns the set of IDs being stored that are not in ids.
+	Unwanted(allocID string, ids []structs.CheckID) []structs.CheckID
+
 	// Keep will reconcile the current set of stored check results with the
 	// list of checkIDs for check results that should be kept.
-	Keep(allocID string, checkIDs []structs.CheckID) error
+	Keep(allocID string, ids []structs.CheckID) error // todo: opimize, we have the list to remove now
 
 	// Purge results for a specific allocation.
 	Purge(allocID string) error
@@ -34,6 +34,18 @@ type Shim interface {
 // AllocResultMap is a view of the check_id -> latest result for group and task
 // checks in an allocation.
 type AllocResultMap map[structs.CheckID]*structs.CheckQueryResult
+
+// diff returns the set of IDs in ids that are not in m.
+func (m AllocResultMap) diff(ids []structs.CheckID) []structs.CheckID {
+	netlog.Red("ARM m: %v, ids: %v", m, ids)
+	var missing []structs.CheckID
+	for _, id := range ids {
+		if _, exists := m[id]; !exists {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
 
 // ClientResultMap is a holistic view of alloc_id -> check_id -> latest result
 // group and task checks across all allocations on a client.
@@ -68,6 +80,8 @@ func (s *shim) Set(allocID string, qr *structs.CheckQueryResult) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	netlog.Red("Set id: %s, result: %v", allocID, qr)
+
 	if allocID == "" {
 		panic("empty alloc id")
 	}
@@ -100,8 +114,8 @@ func (s *shim) List(allocID string) map[structs.CheckID]*structs.CheckQueryResul
 }
 
 func (s *shim) Purge(allocID string) error {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	// remove from our map
 	delete(s.current, allocID)
@@ -110,14 +124,14 @@ func (s *shim) Purge(allocID string) error {
 	return s.db.PurgeCheckResults(allocID)
 }
 
-func (s *shim) Keep(allocID string, checkIDs []structs.CheckID) error {
+func (s *shim) Keep(allocID string, ids []structs.CheckID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// remove from our map and record which ids to remove from persistent store
+	// remove each id in ids from the cache & persistence store
 	var remove []structs.CheckID
 	for id := range s.current[allocID] {
-		if !slices.Contains(checkIDs, id) {
+		if !slices.Contains(ids, id) {
 			delete(s.current[allocID], id)
 			remove = append(remove, id)
 		}
@@ -125,4 +139,18 @@ func (s *shim) Keep(allocID string, checkIDs []structs.CheckID) error {
 
 	// remove from persistent store
 	return s.db.DeleteCheckResults(allocID, remove)
+}
+
+func (s *shim) Unwanted(allocID string, ids []structs.CheckID) []structs.CheckID {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	var remove []structs.CheckID
+	for id := range s.current[allocID] {
+		if !slices.Contains(ids, id) {
+			remove = append(remove, id)
+		}
+	}
+
+	return remove
 }
