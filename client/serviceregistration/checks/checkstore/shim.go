@@ -23,9 +23,8 @@ type Shim interface {
 	// Unwanted returns the set of IDs being stored that are not in ids.
 	Unwanted(allocID string, ids []structs.CheckID) []structs.CheckID
 
-	// Keep will reconcile the current set of stored check results with the
-	// list of checkIDs for check results that should be kept.
-	Keep(allocID string, ids []structs.CheckID) error // todo: opimize, we have the list to remove now
+	// Remove will remove ids from the cache and persistent store.
+	Remove(allocID string, ids []structs.CheckID) error
 
 	// Purge results for a specific allocation.
 	Purge(allocID string) error
@@ -124,21 +123,17 @@ func (s *shim) Purge(allocID string) error {
 	return s.db.PurgeCheckResults(allocID)
 }
 
-func (s *shim) Keep(allocID string, ids []structs.CheckID) error {
+func (s *shim) Remove(allocID string, ids []structs.CheckID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// remove each id in ids from the cache & persistence store
-	var remove []structs.CheckID
-	for id := range s.current[allocID] {
-		if !slices.Contains(ids, id) {
-			delete(s.current[allocID], id)
-			remove = append(remove, id)
-		}
+	// remove from cache
+	for _, id := range ids {
+		delete(s.current[allocID], id)
 	}
 
 	// remove from persistent store
-	return s.db.DeleteCheckResults(allocID, remove)
+	return s.db.DeleteCheckResults(allocID, ids)
 }
 
 func (s *shim) Unwanted(allocID string, ids []structs.CheckID) []structs.CheckID {

@@ -248,8 +248,7 @@ func (h *checksHook) Update(request *interfaces.RunnerUpdateRequest) error {
 	}
 
 	// purge checks that are no longer part of the allocation
-	err := h.shim.Keep(request.Alloc.ID, next)
-	if err != nil {
+	if err := h.shim.Remove(request.Alloc.ID, remove); err != nil {
 		return err
 	}
 
