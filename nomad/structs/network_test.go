@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/nomad/ci"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -211,6 +212,8 @@ func TestNetworkIndex_AddAllocs(t *testing.T) {
 	idx := NewNetworkIndex()
 	allocs := []*Allocation{
 		{
+			ClientStatus:  AllocClientStatusRunning,
+			DesiredStatus: AllocDesiredStatusRun,
 			AllocatedResources: &AllocatedResources{
 				Tasks: map[string]*AllocatedTaskResources{
 					"web": {
@@ -227,6 +230,8 @@ func TestNetworkIndex_AddAllocs(t *testing.T) {
 			},
 		},
 		{
+			ClientStatus:  AllocClientStatusRunning,
+			DesiredStatus: AllocDesiredStatusRun,
 			AllocatedResources: &AllocatedResources{
 				Tasks: map[string]*AllocatedTaskResources{
 					"api": {
@@ -242,24 +247,56 @@ func TestNetworkIndex_AddAllocs(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Allocations running on clients should have their
+			// ports counted even if their DesiredStatus=stop
+			ClientStatus:  AllocClientStatusRunning,
+			DesiredStatus: AllocDesiredStatusStop,
+			AllocatedResources: &AllocatedResources{
+				Tasks: map[string]*AllocatedTaskResources{
+					"api": {
+						Networks: []*NetworkResource{
+							{
+								Device:        "eth0",
+								IP:            "192.168.0.100",
+								MBits:         50,
+								ReservedPorts: []Port{{"one", 10001, 0, ""}},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			// Allocations *not* running on clients should *not*
+			// have their ports counted even if their
+			// DesiredStatus=run
+			ClientStatus:  AllocClientStatusFailed,
+			DesiredStatus: AllocDesiredStatusRun,
+			AllocatedResources: &AllocatedResources{
+				Tasks: map[string]*AllocatedTaskResources{
+					"api": {
+						Networks: []*NetworkResource{
+							{
+								Device:        "eth0",
+								IP:            "192.168.0.100",
+								MBits:         50,
+								ReservedPorts: []Port{{"one", 10001, 0, ""}},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	collide, reason := idx.AddAllocs(allocs)
-	if collide || reason != "" {
-		t.Fatalf("bad")
-	}
+	assert.False(t, collide)
+	assert.Empty(t, reason)
 
-	if idx.UsedBandwidth["eth0"] != 70 {
-		t.Fatalf("Bad")
-	}
-	if !idx.UsedPorts["192.168.0.100"].Check(8000) {
-		t.Fatalf("Bad")
-	}
-	if !idx.UsedPorts["192.168.0.100"].Check(9000) {
-		t.Fatalf("Bad")
-	}
-	if !idx.UsedPorts["192.168.0.100"].Check(10000) {
-		t.Fatalf("Bad")
-	}
+	assert.True(t, idx.UsedPorts["192.168.0.100"].Check(8000))
+	assert.True(t, idx.UsedPorts["192.168.0.100"].Check(9000))
+	assert.True(t, idx.UsedPorts["192.168.0.100"].Check(10000))
+	assert.True(t, idx.UsedPorts["192.168.0.100"].Check(10001))
 }
 
 func TestNetworkIndex_AddReserved(t *testing.T) {
@@ -811,7 +848,7 @@ func TestNetworkIndex_AssignNetwork_Dynamic_Contention_Old(t *testing.T) {
 
 func TestIntContains(t *testing.T) {
 	ci.Parallel(t)
-	
+
 	l := []int{1, 2, 10, 20}
 	if isPortReserved(l, 50) {
 		t.Fatalf("bad")
