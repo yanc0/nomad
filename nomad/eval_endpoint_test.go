@@ -664,7 +664,7 @@ func TestEvalEndpoint_Reap(t *testing.T) {
 	s1.fsm.State().UpsertEvals(structs.MsgTypeTestSetup, 1000, []*structs.Evaluation{eval1})
 
 	// Reap the eval
-	get := &structs.EvalDeleteRequest{
+	get := &structs.EvalReapRequest{
 		Evals:        []string{eval1.ID},
 		WriteRequest: structs.WriteRequest{Region: "global"},
 	}

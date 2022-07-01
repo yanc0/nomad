@@ -374,7 +374,7 @@ func (e *Eval) Reblock(args *structs.EvalUpdateRequest, reply *structs.GenericRe
 }
 
 // Reap is used to cleanup dead evaluations and allocations
-func (e *Eval) Reap(args *structs.EvalDeleteRequest,
+func (e *Eval) Reap(args *structs.EvalReapRequest,
 	reply *structs.GenericResponse) error {
 
 	// Ensure the connection was initiated by another server if TLS is used.

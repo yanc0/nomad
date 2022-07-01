@@ -359,14 +359,14 @@ func (c *CoreScheduler) evalReap(evals, allocs []string) error {
 	return nil
 }
 
-// partitionEvalReap returns a list of EvalDeleteRequest to make, ensuring a single
+// partitionEvalReap returns a list of EvalReapRequest to make, ensuring a single
 // request does not contain too many allocations and evaluations. This is
 // necessary to ensure that the Raft transaction does not become too large.
-func (c *CoreScheduler) partitionEvalReap(evals, allocs []string) []*structs.EvalDeleteRequest {
-	var requests []*structs.EvalDeleteRequest
+func (c *CoreScheduler) partitionEvalReap(evals, allocs []string) []*structs.EvalReapRequest {
+	var requests []*structs.EvalReapRequest
 	submittedEvals, submittedAllocs := 0, 0
 	for submittedEvals != len(evals) || submittedAllocs != len(allocs) {
-		req := &structs.EvalDeleteRequest{
+		req := &structs.EvalReapRequest{
 			WriteRequest: structs.WriteRequest{
 				Region: c.srv.config.Region,
 			},

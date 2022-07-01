@@ -782,7 +782,7 @@ func (n *nomadFSM) handleUpsertedEval(eval *structs.Evaluation) {
 
 func (n *nomadFSM) applyDeleteEval(buf []byte, index uint64) interface{} {
 	defer metrics.MeasureSince([]string{"nomad", "fsm", "delete_eval"}, time.Now())
-	var req structs.EvalDeleteRequest
+	var req structs.EvalReapRequest
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
