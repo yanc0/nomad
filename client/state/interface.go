@@ -92,8 +92,8 @@ type StateDB interface {
 	// PurgeCheckResults removes all check results of the given allocation.
 	PurgeCheckResults(allocID string) error
 
-	// GetCheckResults gets the query result for the alloc.
-	GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error)
+	// GetCheckResults is used to restore the map of alloc -> check_id -> query_result
+	GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error)
 
 	// Close the database. Unsafe for further use after calling regardless
 	// of return value.

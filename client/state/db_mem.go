@@ -250,10 +250,10 @@ func (m *MemDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) err
 	return nil
 }
 
-func (m *MemDB) GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (m *MemDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return helper.CopyMap(m.checks[allocID]), nil
+	return helper.CopyMap(m.checks), nil
 }
 
 func (m *MemDB) DeleteCheckResults(allocID string, checkIDs []structs.CheckID) error {

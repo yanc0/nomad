@@ -76,7 +76,8 @@ var (
 	// stored under
 	allocNetworkStatusKey = []byte("network_status")
 
-	checkStatus = []byte("check_status")
+	// checkResultsBucket is the bucket name in which check query results are stored
+	checkResultsBucket = []byte("check_results")
 
 	// allocations -> $allocid -> task-$taskname -> the keys below
 	taskLocalStateKey = []byte("local_state")
@@ -724,17 +725,21 @@ func (s *BoltStateDB) GetDynamicPluginRegistryState() (*dynamicplugins.RegistryS
 
 // PutCheckResult puts qr into the state store.
 func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) error {
-	netlog.Red("BoltStateDB.PutCheckResult not yet implemented")
+	netlog.Yellow("BoltStateDB.PutCheckResult id: %s, qr: %s", allocID, qr)
 	return s.db.Update(func(tx *boltdd.Tx) error {
-		// todo
-		return nil
+		bkt := tx.Bucket(checkResultsBucket)
+		if bkt == nil {
+			panic("check results bucket does not exist")
+		}
+		key := fmt.Sprintf("%s_%s", allocID, qr.ID)
+		return bkt.Put([]byte(key), qr)
 	})
 }
 
 // GetCheckResults gets the check results associated with allocID from the state store.
-func (s *BoltStateDB) GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (s *BoltStateDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
 	netlog.Red("BoltStateDB.GetCheckResults not yet implemented")
-	var m map[structs.CheckID]*structs.CheckQueryResult
+	var m map[string]map[structs.CheckID]*structs.CheckQueryResult
 	err := s.db.View(func(tx *boltdd.Tx) error {
 		// todo
 		return nil

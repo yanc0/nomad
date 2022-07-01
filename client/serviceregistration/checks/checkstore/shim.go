@@ -60,8 +60,6 @@ type shim struct {
 }
 
 // NewStore creates a new store.
-//
-// (todo: and will initialize from db)
 func NewStore(log hclog.Logger, db state.StateDB) Shim {
 	return &shim{
 		log:     log.Named("check_store"),
@@ -71,8 +69,14 @@ func NewStore(log hclog.Logger, db state.StateDB) Shim {
 }
 
 func (s *shim) restore() {
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// todo restore state from db
 	netlog.Red("shim.restore not yet implemented")
+
+	//
 }
 
 func (s *shim) Set(allocID string, qr *structs.CheckQueryResult) error {

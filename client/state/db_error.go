@@ -96,7 +96,7 @@ func (m *ErrDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) err
 	return fmt.Errorf("Error!")
 }
 
-func (m *ErrDB) GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (m *ErrDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
 	return nil, fmt.Errorf("Error!")
 }
 

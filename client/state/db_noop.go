@@ -91,7 +91,7 @@ func (n NoopDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) err
 	return nil
 }
 
-func (n NoopDB) GetCheckResults(allocID string) (map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (n NoopDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
 	return nil, nil
 }
 

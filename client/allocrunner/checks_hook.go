@@ -37,7 +37,9 @@ type observer struct {
 }
 
 func (o *observer) start() {
-	firstWait := o.check.Interval / 2 // compromise between too early and waiting full interval
+	// compromise between immediate (too early) and waiting full interval (slow)
+	firstWait := o.check.Interval / 2
+
 	timer, cancel := helper.NewSafeTimer(firstWait)
 	defer cancel()
 
