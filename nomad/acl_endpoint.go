@@ -370,9 +370,9 @@ func (a *ACL) GetPolicies(args *structs.ACLPolicySetRequest, reply *structs.ACLP
 
 // Bootstrap is used to bootstrap the initial token
 func (a *ACL) Bootstrap(args *structs.ACLTokenBootstrapRequest, reply *structs.ACLTokenUpsertResponse) error {
-	if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := a.srv.CheckRateLimit("ACL", acl.PolicyWrite, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	// Ensure ACLs are enabled, and always flow modification requests to the authoritative region
 	if !a.srv.config.ACLEnabled {

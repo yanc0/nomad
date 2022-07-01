@@ -79,11 +79,11 @@ type Node struct {
 
 // Register is used to upsert a client that is available for scheduling
 func (n *Node) Register(args *structs.NodeRegisterRequest, reply *structs.NodeUpdateResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	isForwarded := args.IsForwarded()
 	if done, err := n.srv.forward("Node.Register", args, args, reply); done {
@@ -302,11 +302,11 @@ func (n *Node) constructNodeServerInfoResponse(snap *state.StateSnapshot, reply 
 // Deregister is used to remove a client from the cluster. If a client should
 // just be made unavailable for scheduling, a status update is preferred.
 func (n *Node) Deregister(args *structs.NodeDeregisterRequest, reply *structs.NodeUpdateResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	if done, err := n.srv.forward("Node.Deregister", args, args, reply); done {
 		return err
@@ -330,11 +330,11 @@ func (n *Node) Deregister(args *structs.NodeDeregisterRequest, reply *structs.No
 
 // BatchDeregister is used to remove client nodes from the cluster.
 func (n *Node) BatchDeregister(args *structs.NodeBatchDeregisterRequest, reply *structs.NodeUpdateResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	if done, err := n.srv.forward("Node.BatchDeregister", args, args, reply); done {
 		return err
@@ -435,11 +435,11 @@ func (n *Node) deregister(args *structs.NodeBatchDeregisterRequest,
 
 // UpdateStatus is used to update the status of a client node
 func (n *Node) UpdateStatus(args *structs.NodeUpdateStatusRequest, reply *structs.NodeUpdateResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	isForwarded := args.IsForwarded()
 	if done, err := n.srv.forward("Node.UpdateStatus", args, args, reply); done {
@@ -606,9 +606,9 @@ func nodeStatusTransitionRequiresEval(newStatus, oldStatus string) bool {
 // UpdateDrain is used to update the drain mode of a client node
 func (n *Node) UpdateDrain(args *structs.NodeUpdateDrainRequest,
 	reply *structs.NodeDrainUpdateResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.UpdateDrain", args, args, reply); done {
 		return err
@@ -703,9 +703,9 @@ func (n *Node) UpdateDrain(args *structs.NodeUpdateDrainRequest,
 // UpdateEligibility is used to update the scheduling eligibility of a node
 func (n *Node) UpdateEligibility(args *structs.NodeUpdateEligibilityRequest,
 	reply *structs.NodeEligibilityUpdateResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.UpdateEligibility", args, args, reply); done {
 		return err
@@ -802,9 +802,9 @@ func (n *Node) UpdateEligibility(args *structs.NodeUpdateEligibilityRequest,
 
 // Evaluate is used to force a re-evaluation of the node
 func (n *Node) Evaluate(args *structs.NodeEvaluateRequest, reply *structs.NodeUpdateResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.Evaluate", args, args, reply); done {
 		return err
@@ -861,9 +861,9 @@ func (n *Node) Evaluate(args *structs.NodeEvaluateRequest, reply *structs.NodeUp
 // GetNode is used to request information about a specific node
 func (n *Node) GetNode(args *structs.NodeSpecificRequest,
 	reply *structs.SingleNodeResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyRead, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyRead, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.GetNode", args, args, reply); done {
 		return err
@@ -936,9 +936,9 @@ func (n *Node) GetNode(args *structs.NodeSpecificRequest,
 // GetAllocs is used to request allocations for a specific node
 func (n *Node) GetAllocs(args *structs.NodeSpecificRequest,
 	reply *structs.NodeAllocsResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyRead, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyRead, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.GetAllocs", args, args, reply); done {
 		return err
@@ -1030,11 +1030,11 @@ func (n *Node) GetAllocs(args *structs.NodeSpecificRequest,
 // per allocation.
 func (n *Node) GetClientAllocs(args *structs.NodeSpecificRequest,
 	reply *structs.NodeClientAllocsResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	isForwarded := args.IsForwarded()
 	if done, err := n.srv.forward("Node.GetClientAllocs", args, args, reply); done {
@@ -1174,11 +1174,11 @@ func (n *Node) GetClientAllocs(args *structs.NodeSpecificRequest,
 
 // UpdateAlloc is used to update the client status of an allocation
 func (n *Node) UpdateAlloc(args *structs.AllocUpdateRequest, reply *structs.GenericResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another client if TLS is used.
 	err := validateTLSCertificateLevel(n.srv, n.ctx, tlsCertificateLevelClient)
@@ -1424,9 +1424,9 @@ func (n *Node) batchUpdate(future *structs.BatchFuture, updates []*structs.Alloc
 // List is used to list the available nodes
 func (n *Node) List(args *structs.NodeListRequest,
 	reply *structs.NodeListResponse) error {
-	if err := n.srv.CheckRateLimit("Node", acl.PolicyList, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := n.srv.CheckRateLimit("Node", acl.PolicyList, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := n.srv.forward("Node.List", args, args, reply); done {
 		return err
@@ -1610,11 +1610,11 @@ func (n *Node) createNodeEvals(nodeID string, nodeIndex uint64) ([]string, uint6
 // DeriveVaultToken is used by the clients to request wrapped Vault tokens for
 // tasks
 func (n *Node) DeriveVaultToken(args *structs.DeriveVaultTokenRequest, reply *structs.DeriveVaultTokenResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	setError := func(e error, recoverable bool) {
 		if e != nil {
@@ -1838,11 +1838,11 @@ type connectTask struct {
 }
 
 func (n *Node) DeriveSIToken(args *structs.DeriveSITokenRequest, reply *structs.DeriveSITokenResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	setError := func(e error, recoverable bool) {
 		if e != nil {
@@ -2077,11 +2077,11 @@ func taskUsesConnect(task *structs.Task) bool {
 }
 
 func (n *Node) EmitEvents(args *structs.EmitNodeEventsRequest, reply *structs.EmitNodeEventsResponse) error {
-	if n.ctx != nil {
-		if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if n.ctx != nil {
+	// 	if err := n.srv.CheckRateLimit("Node", acl.PolicyWrite, n.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another client if TLS is used.
 	err := validateTLSCertificateLevel(n.srv, n.ctx, tlsCertificateLevelClient)

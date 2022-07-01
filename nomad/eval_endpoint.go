@@ -34,9 +34,9 @@ type Eval struct {
 // GetEval is used to request information about a specific evaluation
 func (e *Eval) GetEval(args *structs.EvalSpecificRequest,
 	reply *structs.SingleEvalResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := e.srv.forward("Eval.GetEval", args, args, reply); done {
 		return err
@@ -107,11 +107,11 @@ func (e *Eval) GetEval(args *structs.EvalSpecificRequest,
 // Dequeue is used to dequeue a pending evaluation
 func (e *Eval) Dequeue(args *structs.EvalDequeueRequest,
 	reply *structs.EvalDequeueResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -204,11 +204,11 @@ func (e *Eval) getWaitIndex(namespace, job string, evalModifyIndex uint64) (uint
 // Ack is used to acknowledge completion of a dequeued evaluation
 func (e *Eval) Ack(args *structs.EvalAckRequest,
 	reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -231,11 +231,11 @@ func (e *Eval) Ack(args *structs.EvalAckRequest,
 // Nack is used to negative acknowledge completion of a dequeued evaluation.
 func (e *Eval) Nack(args *structs.EvalAckRequest,
 	reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -258,11 +258,11 @@ func (e *Eval) Nack(args *structs.EvalAckRequest,
 // Update is used to perform an update of an Eval if it is outstanding.
 func (e *Eval) Update(args *structs.EvalUpdateRequest,
 	reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -300,11 +300,11 @@ func (e *Eval) Update(args *structs.EvalUpdateRequest,
 // Create is used to make a new evaluation
 func (e *Eval) Create(args *structs.EvalUpdateRequest,
 	reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -357,11 +357,11 @@ func (e *Eval) Create(args *structs.EvalUpdateRequest,
 // Reblock is used to reinsert an existing blocked evaluation into the blocked
 // evaluation tracker.
 func (e *Eval) Reblock(args *structs.EvalUpdateRequest, reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -411,11 +411,11 @@ func (e *Eval) Reblock(args *structs.EvalUpdateRequest, reply *structs.GenericRe
 // Reap is used to cleanup dead evaluations and allocations
 func (e *Eval) Reap(args *structs.EvalDeleteRequest,
 	reply *structs.GenericResponse) error {
-	if e.ctx != nil {
-		if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
-			return err
-		}
-	}
+	// if e.ctx != nil {
+	// 	if err := e.srv.CheckRateLimit("Eval", acl.PolicyWrite, e.ctx.NodeID); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Ensure the connection was initiated by another server if TLS is used.
 	err := validateTLSCertificateLevel(e.srv, e.ctx, tlsCertificateLevelServer)
@@ -441,9 +441,9 @@ func (e *Eval) Reap(args *structs.EvalDeleteRequest,
 
 // List is used to get a list of the evaluations in the system
 func (e *Eval) List(args *structs.EvalListRequest, reply *structs.EvalListResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyList, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := e.srv.CheckRateLimit("Eval", acl.PolicyList, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := e.srv.forward("Eval.List", args, args, reply); done {
 		return err
@@ -547,9 +547,9 @@ func (e *Eval) List(args *structs.EvalListRequest, reply *structs.EvalListRespon
 // Allocations is used to list the allocations for an evaluation
 func (e *Eval) Allocations(args *structs.EvalSpecificRequest,
 	reply *structs.EvalAllocationsResponse) error {
-	if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, args.AuthToken); err != nil {
-		return err
-	}
+	// if err := e.srv.CheckRateLimit("Eval", acl.PolicyRead, args.AuthToken); err != nil {
+	// 	return err
+	// }
 
 	if done, err := e.srv.forward("Eval.Allocations", args, args, reply); done {
 		return err
