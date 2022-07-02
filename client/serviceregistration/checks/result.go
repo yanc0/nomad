@@ -53,12 +53,19 @@ type QueryContext struct {
 
 // Stub creates a temporary QueryResult for the check of ID in the Pending state
 // so we can represent the status of not being checked yet.
-func Stub(id structs.CheckID, kind structs.CheckMode, now int64) *structs.CheckQueryResult {
+func Stub(
+	id structs.CheckID, kind structs.CheckMode, now int64,
+	group, task, service, check string,
+) *structs.CheckQueryResult {
 	return &structs.CheckQueryResult{
 		ID:        id,
 		Mode:      kind,
 		Status:    structs.CheckPending,
 		Output:    "nomad: waiting to run",
 		Timestamp: now,
+		Group:     group,
+		Task:      task,
+		Service:   service,
+		Check:     check,
 	}
 }

@@ -46,7 +46,7 @@ type CheckQueryResult struct {
 
 	// check coordinates
 	Group   string
-	Task    string
+	Task    string `json:",omitempty"`
 	Service string
 	Check   string
 }

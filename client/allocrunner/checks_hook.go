@@ -188,7 +188,7 @@ func (h *checksHook) observe(alloc *structs.Allocation, services []*structs.Serv
 			netlog.Yellow("group: %s, task: %s, service: %s, check: %s", alloc.Name, service.TaskName, service.Name, check.Name)
 
 			// insert a pending result into state store for each check
-			result := checks.Stub(id, structs.GetCheckMode(check), now)
+			result := checks.Stub(id, structs.GetCheckMode(check), now, alloc.Name, service.TaskName, service.Name, check.Name)
 			if err := h.shim.Set(h.allocID, result); err != nil {
 				h.logger.Error("failed to set initial check status", "id", h.allocID, "error", err)
 				continue

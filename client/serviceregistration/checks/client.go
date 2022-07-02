@@ -44,14 +44,7 @@ func (c *checker) now() int64 {
 
 // Do will execute the Query given the QueryContext and produce a QueryResult
 func (c *checker) Do(qc *QueryContext, q *Query) *structs.CheckQueryResult {
-	qr := &structs.CheckQueryResult{
-		Group:   qc.Group,
-		Task:    qc.Task,
-		Service: qc.Service,
-		Check:   qc.Check,
-	}
-
-	netlog.Yellow("DO group: %s, task: %s, service: %s, check: %s", qr.Group, qr.Task, qr.Service, qr.Check)
+	var qr *structs.CheckQueryResult
 
 	switch q.Type {
 	case "http":
@@ -61,6 +54,10 @@ func (c *checker) Do(qc *QueryContext, q *Query) *structs.CheckQueryResult {
 	}
 
 	qr.ID = qc.ID
+	qr.Group = qc.Group
+	qr.Task = qc.Task
+	qr.Service = qc.Service
+	qr.Check = qc.Check
 	return qr
 }
 
