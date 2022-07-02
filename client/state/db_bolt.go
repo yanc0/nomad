@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/hashicorp/nomad/helper"
 	"os"
 	"path/filepath"
 	"time"
@@ -739,11 +740,23 @@ func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResul
 
 // GetCheckResults gets the check results associated with allocID from the state store.
 func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
+	netlog.White("BoltStateDB.GetCheckResults")
 	var m checks.ClientResults
-	err := s.db.BoltDB().View(func(tx *bbolt.Tx) error {
+
+	err := s.db.View(func(tx *boltdd.Tx) error {
 		bkt := tx.Bucket(checkResultsBucket)
 		if bkt == nil {
 			return fmt.Errorf("missing %s bucket", string(checkResultsBucket))
+		}
+		if err := bkt.Iterate(func(id []byte) error {
+			var ar checks.AllocationResults
+			if err := bkt.Get(id, &ar); err != nil {
+				return err
+			}
+			m[string(id)] = helper.CopyMap(ar)
+			return nil
+		}); err != nil {
+			return err
 		}
 
 		return nil

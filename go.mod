@@ -131,6 +131,8 @@ require (
 	oss.indeed.com/go/libtime v1.5.0
 )
 
+require gophers.dev/pkgs/netlog v0.1.1
+
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	cloud.google.com/go/storage v1.18.2 // indirect

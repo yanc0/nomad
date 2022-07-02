@@ -122,7 +122,7 @@ func (c *checker) checkTCP(qc *QueryContext, q *Query) *structs.CheckQueryResult
 		return qr
 	}
 
-	qr.Output = "nomad: ok"
+	qr.Output = "nomad: tcp ok"
 	return qr
 }
 
@@ -163,7 +163,7 @@ func (c *checker) checkHTTP(qc *QueryContext, q *Query) *structs.CheckQueryResul
 	switch {
 	case result.StatusCode == 200:
 		qr.Status = structs.CheckSuccess
-		qr.Output = "nomad: ok"
+		qr.Output = "nomad: http ok"
 		return qr
 	case result.StatusCode < 400:
 		qr.Status = structs.CheckSuccess

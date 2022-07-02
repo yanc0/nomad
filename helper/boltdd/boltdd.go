@@ -353,6 +353,17 @@ func (b *Bucket) Get(key []byte, obj interface{}) error {
 	return nil
 }
 
+// Iterate iterates every key in Bucket b.
+func (b *Bucket) Iterate(fn func(k []byte) error) error {
+	c := b.boltBucket.Cursor()
+	for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		if err := fn(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Delete removes a key from the bucket. If the key does not exist then nothing
 // is done and a nil error is returned. Returns an error if the bucket was
 // created from a read-only transaction.
