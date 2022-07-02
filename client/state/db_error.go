@@ -7,6 +7,7 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
 
@@ -96,7 +97,7 @@ func (m *ErrDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) err
 	return fmt.Errorf("Error!")
 }
 
-func (m *ErrDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (m *ErrDB) GetCheckResults() (checks.ClientResults, error) {
 	return nil, fmt.Errorf("Error!")
 }
 

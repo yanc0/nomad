@@ -5,6 +5,7 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
 
@@ -91,7 +92,7 @@ func (n NoopDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) err
 	return nil
 }
 
-func (n NoopDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
+func (n NoopDB) GetCheckResults() (checks.ClientResults, error) {
 	return nil, nil
 }
 

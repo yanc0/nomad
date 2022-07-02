@@ -5,6 +5,7 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
 
@@ -92,8 +93,8 @@ type StateDB interface {
 	// PurgeCheckResults removes all check results of the given allocation.
 	PurgeCheckResults(allocID string) error
 
-	// GetCheckResults is used to restore the map of alloc -> check_id -> query_result
-	GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error)
+	// GetCheckResults is used to restore the set of check results on this Client.
+	GetCheckResults() (checks.ClientResults, error)
 
 	// Close the database. Unsafe for further use after calling regardless
 	// of return value.

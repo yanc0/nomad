@@ -11,6 +11,7 @@ import (
 	dmstate "github.com/hashicorp/nomad/client/devicemanager/state"
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/helper/boltdd"
 	"github.com/hashicorp/nomad/nomad/structs"
 	"go.etcd.io/bbolt"
@@ -201,7 +202,7 @@ type allocEntry struct {
 }
 
 func (s *BoltStateDB) getAllAllocations(tx *boltdd.Tx) ([]*structs.Allocation, map[string]error) {
-	allocs := []*structs.Allocation{}
+	var allocs []*structs.Allocation
 	errs := map[string]error{}
 
 	allocationsBkt := tx.Bucket(allocationsBucketName)
@@ -725,11 +726,11 @@ func (s *BoltStateDB) GetDynamicPluginRegistryState() (*dynamicplugins.RegistryS
 
 // PutCheckResult puts qr into the state store.
 func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) error {
-	netlog.Yellow("BoltStateDB.PutCheckResult id: %s, qr: %s", allocID, qr)
+	netlog.White("BoltStateDB.PutCheckResult id: %s, qr: %s", allocID, qr)
 	return s.db.Update(func(tx *boltdd.Tx) error {
-		bkt := tx.Bucket(checkResultsBucket)
-		if bkt == nil {
-			panic("check results bucket does not exist")
+		bkt, err := tx.CreateBucketIfNotExists(checkResultsBucket)
+		if err != nil {
+			return err
 		}
 		key := fmt.Sprintf("%s_%s", allocID, qr.ID)
 		return bkt.Put([]byte(key), qr)
@@ -737,11 +738,14 @@ func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResul
 }
 
 // GetCheckResults gets the check results associated with allocID from the state store.
-func (s *BoltStateDB) GetCheckResults() (map[string]map[structs.CheckID]*structs.CheckQueryResult, error) {
-	netlog.Red("BoltStateDB.GetCheckResults not yet implemented")
-	var m map[string]map[structs.CheckID]*structs.CheckQueryResult
-	err := s.db.View(func(tx *boltdd.Tx) error {
-		// todo
+func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
+	var m checks.ClientResults
+	err := s.db.BoltDB().View(func(tx *bbolt.Tx) error {
+		bkt := tx.Bucket(checkResultsBucket)
+		if bkt == nil {
+			return fmt.Errorf("missing %s bucket", string(checkResultsBucket))
+		}
+
 		return nil
 	})
 	return m, err

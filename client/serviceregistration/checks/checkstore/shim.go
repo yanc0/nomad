@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/nomad/client/serviceregistration/checks"
 	"github.com/hashicorp/nomad/client/state"
 	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/nomad/structs"
@@ -30,33 +31,13 @@ type Shim interface {
 	Purge(allocID string) error
 }
 
-// AllocResultMap is a view of the check_id -> latest result for group and task
-// checks in an allocation.
-type AllocResultMap map[structs.CheckID]*structs.CheckQueryResult
-
-// diff returns the set of IDs in ids that are not in m.
-func (m AllocResultMap) diff(ids []structs.CheckID) []structs.CheckID {
-	netlog.Red("ARM m: %v, ids: %v", m, ids)
-	var missing []structs.CheckID
-	for _, id := range ids {
-		if _, exists := m[id]; !exists {
-			missing = append(missing, id)
-		}
-	}
-	return missing
-}
-
-// ClientResultMap is a holistic view of alloc_id -> check_id -> latest result
-// group and task checks across all allocations on a client.
-type ClientResultMap map[string]AllocResultMap
-
 type shim struct {
 	log hclog.Logger
 
 	db state.StateDB
 
 	lock    sync.RWMutex
-	current ClientResultMap
+	current checks.ClientResults
 }
 
 // NewStore creates a new store.
@@ -64,19 +45,24 @@ func NewStore(log hclog.Logger, db state.StateDB) Shim {
 	return &shim{
 		log:     log.Named("check_store"),
 		db:      db,
-		current: make(ClientResultMap),
+		current: make(checks.ClientResults),
 	}
 }
 
 func (s *shim) restore() {
-
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// todo restore state from db
-	netlog.Red("shim.restore not yet implemented")
+	results, err := s.db.GetCheckResults()
+	if err != nil {
+		s.log.Error("failed to restore health check results", "error", err)
+		return
+	}
 
-	//
+	for id, m := range results {
+		s.current[id] = helper.CopyMap(m)
+		netlog.Cyan("restore check map[%s]", id)
+	}
 }
 
 func (s *shim) Set(allocID string, qr *structs.CheckQueryResult) error {
