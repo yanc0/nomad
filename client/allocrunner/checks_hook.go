@@ -150,7 +150,7 @@ func (h *checksHook) observe(alloc *structs.Allocation, services []*structs.Serv
 			now := time.Now().UTC().Unix()
 
 			// create the deterministic check id for this check
-			id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, check.TaskName, check.Name)
+			id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, check.TaskName, check.Name, check.Path)
 
 			netlog.Purple("observe %s : %s : %s", service.Name, check.Name, id)
 
@@ -237,6 +237,7 @@ func (h *checksHook) Update(request *interfaces.RunnerUpdateRequest) error {
 				request.Alloc.TaskGroup,
 				service.TaskName,
 				check.Name,
+				check.Path,
 			))
 		}
 	}

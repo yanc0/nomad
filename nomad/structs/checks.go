@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"crypto/md5"
 	"fmt"
 )
 
@@ -77,15 +78,34 @@ func (s CheckStatus) String() string {
 	}
 }
 
+type CheckParts struct {
+	AllocID  string
+	Group    string
+	Task     string
+	Protocol string
+
+	Path string
+}
+
 // MakeCheckID returns an ID unique to the check.
 //
 // Checks of group-level services have no task.
-func MakeCheckID(allocID, group, task, name string) CheckID {
-	id := allocID[0:8]
-	if task == "" || task == "group" {
-		return CheckID(fmt.Sprintf("chk_%s_%s_%s", group, name, id))
-	}
-	return CheckID(fmt.Sprintf("chk_%s_%s_%s_%s", group, task, name, id))
+func MakeCheckID(allocID, group, task, name, path string) CheckID {
+
+	sum := md5.New()
+	_, _ = sum.Write([]byte(allocID))
+	_, _ = sum.Write([]byte(group))
+	_, _ = sum.Write([]byte(task))
+	_, _ = sum.Write([]byte(name))
+	_, _ = sum.Write([]byte(path))
+	h := sum.Sum(nil)
+	return CheckID(fmt.Sprintf("%x", h))
+
+	// id := allocID[0:8]
+	// if task == "" || task == "group" {
+	// 	return CheckID(fmt.Sprintf("chk_%s_%s_%s", group, name, id))
+	// }
+	// return CheckID(fmt.Sprintf("chk_%s_%s_%s_%s", group, task, name, id))
 }
 
 // server only, to proxy to client
