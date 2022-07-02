@@ -150,7 +150,7 @@ func (h *checksHook) observe(alloc *structs.Allocation, services []*structs.Serv
 			now := time.Now().UTC().Unix()
 
 			// create the deterministic check id for this check
-			id := structs.MakeCheckID(alloc.ID, alloc.TaskGroup, check.TaskName, check.Name, check.Path)
+			id := structs.NomadCheckID(alloc.ID, alloc.TaskGroup, check)
 
 			netlog.Purple("observe %s : %s : %s", service.Name, check.Name, id)
 
@@ -177,10 +177,15 @@ func (h *checksHook) observe(alloc *structs.Allocation, services []*structs.Serv
 					Ports:            ports,
 					Networks:         networks,
 					NetworkStatus:    h.network,
+					Group:            alloc.Name,
+					Task:             service.TaskName,
+					Service:          service.Name,
+					Check:            check.Name,
 				},
 			}
 
 			netlog.Purple(" -> create observer")
+			netlog.Yellow("group: %s, task: %s, service: %s, check: %s", alloc.Name, service.TaskName, service.Name, check.Name)
 
 			// insert a pending result into state store for each check
 			result := checks.Stub(id, structs.GetCheckMode(check), now)
@@ -232,12 +237,10 @@ func (h *checksHook) Update(request *interfaces.RunnerUpdateRequest) error {
 	next := make([]structs.CheckID, 0, len(h.observers))
 	for _, service := range services {
 		for _, check := range service.Checks {
-			next = append(next, structs.MakeCheckID(
+			next = append(next, structs.NomadCheckID(
 				request.Alloc.ID,
 				request.Alloc.TaskGroup,
-				service.TaskName,
-				check.Name,
-				check.Path,
+				check,
 			))
 		}
 	}

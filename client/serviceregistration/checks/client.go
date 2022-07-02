@@ -1,8 +1,9 @@
 package checks
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -43,7 +44,14 @@ func (c *checker) now() int64 {
 
 // Do will execute the Query given the QueryContext and produce a QueryResult
 func (c *checker) Do(qc *QueryContext, q *Query) *structs.CheckQueryResult {
-	var qr *structs.CheckQueryResult
+	qr := &structs.CheckQueryResult{
+		Group:   qc.Group,
+		Task:    qc.Task,
+		Service: qc.Service,
+		Check:   qc.Check,
+	}
+
+	netlog.Yellow("DO group: %s, task: %s, service: %s, check: %s", qr.Group, qr.Task, qr.Service, qr.Check)
 
 	switch q.Type {
 	case "http":
@@ -99,7 +107,7 @@ func address(qc *QueryContext, q *Query) (string, error) {
 
 func (c *checker) checkTCP(qc *QueryContext, q *Query) *structs.CheckQueryResult {
 	qr := &structs.CheckQueryResult{
-		Kind:      q.Kind,
+		Mode:      q.Kind,
 		Timestamp: c.now(),
 		Status:    structs.CheckSuccess,
 	}
@@ -123,7 +131,7 @@ func (c *checker) checkTCP(qc *QueryContext, q *Query) *structs.CheckQueryResult
 
 func (c *checker) checkHTTP(qc *QueryContext, q *Query) *structs.CheckQueryResult {
 	qr := &structs.CheckQueryResult{
-		Kind:      q.Kind,
+		Mode:      q.Kind,
 		Timestamp: c.now(),
 		Status:    structs.CheckPending,
 	}
@@ -155,19 +163,36 @@ func (c *checker) checkHTTP(qc *QueryContext, q *Query) *structs.CheckQueryResul
 		return qr
 	}
 
-	b, err := ioutil.ReadAll(result.Body)
-	if err != nil {
-		qr.Output = fmt.Sprintf("nomad: %s", err.Error())
-		// let the status code dictate query result
-	} else {
-		qr.Output = string(b)
-	}
-
-	if result.StatusCode < 400 {
+	switch {
+	case result.StatusCode == 200:
 		qr.Status = structs.CheckSuccess
-	} else {
+		qr.Output = "nomad: ok"
+		return qr
+	case result.StatusCode < 400:
+		qr.Status = structs.CheckSuccess
+	default:
 		qr.Status = structs.CheckFailure
 	}
 
+	// status code was not 200; read the response body and set that as the
+	// check result output content
+	qr.Output = limitRead(result.Body)
+
 	return qr
+}
+
+const (
+	// outputSizeLimit is the maximum number of bytes to read and store of an http
+	// check output. Set to 3kb which fits in 1 page with room for other fields.
+	outputSizeLimit = 3 * 1024
+)
+
+func limitRead(r io.Reader) string {
+	b := make([]byte, 0, outputSizeLimit)
+	output := bytes.NewBuffer(b)
+	limited := io.LimitReader(r, outputSizeLimit)
+	if _, err := io.Copy(output, limited); err != nil {
+		return fmt.Sprintf("nomad: %s", err.Error())
+	}
+	return output.String()
 }

@@ -44,6 +44,11 @@ type QueryContext struct {
 	Networks         structs.Networks
 	NetworkStatus    structs.NetworkStatus
 	Ports            structs.AllocatedPorts
+
+	Group   string
+	Task    string
+	Service string
+	Check   string
 }
 
 // Stub creates a temporary QueryResult for the check of ID in the Pending state
@@ -51,9 +56,9 @@ type QueryContext struct {
 func Stub(id structs.CheckID, kind structs.CheckMode, now int64) *structs.CheckQueryResult {
 	return &structs.CheckQueryResult{
 		ID:        id,
-		Kind:      kind,
+		Mode:      kind,
 		Status:    structs.CheckPending,
-		Output:    "waiting on nomad",
+		Output:    "nomad: waiting to run",
 		Timestamp: now,
 	}
 }

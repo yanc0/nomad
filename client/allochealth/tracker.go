@@ -625,7 +625,7 @@ func (t *Tracker) watchNomadEvents() {
 				netlog.Green("-> success")
 				continue
 			case structs.CheckFailure:
-				if result.Kind == structs.Readiness {
+				if result.Mode == structs.Readiness {
 					netlog.Green("-> failure, readiness")
 					continue
 				}

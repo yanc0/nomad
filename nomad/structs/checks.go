@@ -2,22 +2,23 @@ package structs
 
 import (
 	"crypto/md5"
+	"encoding/binary"
 	"fmt"
 )
 
 // The CheckMode of a check is either Healthiness or Readiness.
-type CheckMode byte
+type CheckMode string
 
 const (
 	// A Healthiness check is asking a service, "are you healthy?". A service that
 	// is healthy is thought to be _capable_ of serving traffic, but might not
 	// want it yet.
-	Healthiness CheckMode = iota
+	Healthiness CheckMode = "healthiness"
 
 	// A Readiness check is asking a service, "do you want traffic?". A service
 	// that is not ready is thought to not want traffic, even if it is passing
 	// other healthiness checks.
-	Readiness
+	Readiness CheckMode = "readiness"
 )
 
 // GetCheckMode determines whether the check is readiness or healthiness.
@@ -31,15 +32,6 @@ func GetCheckMode(c *ServiceCheck) CheckMode {
 // An CheckID is unique to a check.
 type CheckID string
 
-func (c CheckMode) String() string {
-	switch c {
-	case Readiness:
-		return "readiness"
-	default:
-		return "healthiness"
-	}
-}
-
 // A CheckQueryResult represents the outcome of a single execution of a Nomad service
 // check. It records the result, the output, and when the execution took place.
 //
@@ -47,65 +39,59 @@ func (c CheckMode) String() string {
 // Any check math (e.g. success_before_passing) is left to the caller.
 type CheckQueryResult struct {
 	ID        CheckID
-	Kind      CheckMode
+	Mode      CheckMode
 	Status    CheckStatus
 	Output    string
 	Timestamp int64
+
+	// check coordinates
+	Group   string
+	Task    string
+	Service string
+	Check   string
 }
 
 func (r *CheckQueryResult) String() string {
-	return fmt.Sprintf("(%s %s %s %v)", r.ID, r.Kind, r.Status, r.Timestamp)
+	return fmt.Sprintf("(%s %s %s %v)", r.ID, r.Mode, r.Status, r.Timestamp)
 }
 
-// A CheckStatus is resultant detected status of a check upon executing it. The
-// status of a query is ternary - success, failure, or pending (not yet executed).
-type CheckStatus byte
+// A CheckStatus is the result of executing a check. The status of a query is
+// ternary - success, failure, or pending (not yet executed). Deployments treat
+// pending and failure as the same - a deployment cannot continue until a check
+// is passing.
+type CheckStatus string
 
 const (
-	CheckSuccess CheckStatus = iota
-	CheckFailure
-	CheckPending
+	CheckSuccess CheckStatus = "success"
+	CheckFailure CheckStatus = "failure"
+	CheckPending CheckStatus = "pending"
 )
 
-func (s CheckStatus) String() string {
-	switch s {
-	case CheckSuccess:
-		return "success"
-	case CheckFailure:
-		return "failure"
-	default:
-		return "pending"
-	}
-}
-
-type CheckParts struct {
-	AllocID  string
-	Group    string
-	Task     string
-	Protocol string
-
-	Path string
-}
-
-// MakeCheckID returns an ID unique to the check.
+// NomadCheckID returns an ID unique to the nomad service check.
 //
 // Checks of group-level services have no task.
-func MakeCheckID(allocID, group, task, name, path string) CheckID {
-
+func NomadCheckID(allocID, group string, c *ServiceCheck) CheckID {
 	sum := md5.New()
-	_, _ = sum.Write([]byte(allocID))
-	_, _ = sum.Write([]byte(group))
-	_, _ = sum.Write([]byte(task))
-	_, _ = sum.Write([]byte(name))
-	_, _ = sum.Write([]byte(path))
+	write := func(s string) {
+		if s != "" {
+			_, _ = sum.Write([]byte(s))
+		}
+	}
+	write(allocID)
+	write(group)
+	write(c.TaskName)
+	write(c.Name)
+	write(c.Type)
+	write(c.PortLabel)
+	write(c.OnUpdate)
+	write(c.AddressMode)
+	_ = binary.Write(sum, binary.LittleEndian, c.Interval)
+	_ = binary.Write(sum, binary.LittleEndian, c.Timeout)
+	write(c.Protocol)
+	write(c.Path)
+	write(c.Method)
 	h := sum.Sum(nil)
 	return CheckID(fmt.Sprintf("%x", h))
-
-	// id := allocID[0:8]
-	// if task == "" || task == "group" {
-	// 	return CheckID(fmt.Sprintf("chk_%s_%s_%s", group, name, id))
-	// }
-	// return CheckID(fmt.Sprintf("chk_%s_%s_%s_%s", group, task, name, id))
 }
 
 // server only, to proxy to client
