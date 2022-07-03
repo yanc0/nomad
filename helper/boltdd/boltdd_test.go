@@ -94,8 +94,93 @@ func TestBucket_Create(t *testing.T) {
 	// Bucket should be visible
 	must.NoError(t, db.View(func(tx *Tx) error {
 		must.NotNil(t, tx.Bucket(name))
+
 		return nil
 	}))
+}
+
+func TestBucket_Iterate(t *testing.T) {
+	ci.Parallel(t)
+
+	db := setupBoltDB(t)
+
+	bucket := []byte("iterate_test")
+
+	must.NoError(t, db.Update(func(tx *Tx) error {
+		b, err := tx.CreateBucketIfNotExists(bucket)
+		must.NoError(t, err)
+		must.NotNil(t, b)
+
+		must.NoError(t, b.Put([]byte("ceo"), employee{Name: "dave", ID: 15}))
+		must.NoError(t, b.Put([]byte("founder"), employee{Name: "mitchel", ID: 1}))
+		must.NoError(t, b.Put([]byte("cto"), employee{Name: "armon", ID: 2}))
+		return nil
+	}))
+
+	t.Run("success", func(t *testing.T) {
+		var result []employee
+		err := db.View(func(tx *Tx) error {
+			b := tx.Bucket(bucket)
+			return Iterate(b, nil, func(key []byte, e employee) {
+				result = append(result, e)
+			})
+		})
+		must.NoError(t, err)
+		must.Eq(t, []employee{
+			{"dave", 15}, {"armon", 2}, {"mitchel", 1},
+		}, result)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		err := db.View(func(tx *Tx) error {
+			b := tx.Bucket(bucket)
+			// will fail to encode employee into an int
+			return Iterate(b, nil, func(key []byte, i int) {
+				must.True(t, false) // must not get here
+			})
+		})
+		must.Error(t, err)
+	})
+}
+
+func TestBucket_DeletePrefix(t *testing.T) {
+	ci.Parallel(t)
+
+	db := setupBoltDB(t)
+
+	bucket := []byte("delete_prefix_test")
+
+	must.NoError(t, db.Update(func(tx *Tx) error {
+		b, err := tx.CreateBucketIfNotExists(bucket)
+		must.NoError(t, err)
+		must.NotNil(t, b)
+
+		must.NoError(t, b.Put([]byte("exec_a"), employee{Name: "dave", ID: 15}))
+		must.NoError(t, b.Put([]byte("intern_a"), employee{Name: "alice", ID: 7384}))
+		must.NoError(t, b.Put([]byte("exec_c"), employee{Name: "armon", ID: 2}))
+		must.NoError(t, b.Put([]byte("intern_b"), employee{Name: "bob", ID: 7312}))
+		must.NoError(t, b.Put([]byte("exec_b"), employee{Name: "mitchel", ID: 1}))
+		return nil
+	}))
+
+	// remove interns
+	must.NoError(t, db.Update(func(tx *Tx) error {
+		bkt := tx.Bucket(bucket)
+		return bkt.DeletePrefix([]byte("intern_"))
+	}))
+
+	// assert 3 exec remain
+	var result []employee
+	err := db.View(func(tx *Tx) error {
+		bkt := tx.Bucket(bucket)
+		return Iterate(bkt, nil, func(k []byte, e employee) {
+			result = append(result, e)
+		})
+	})
+	must.NoError(t, err)
+	must.Eq(t, []employee{
+		{"dave", 15}, {"mitchel", 1}, {"armon", 2},
+	}, result)
 }
 
 func TestBucket_DedupeWrites(t *testing.T) {
@@ -215,7 +300,8 @@ func TestBucket_Delete(t *testing.T) {
 	must.NoError(t, db.View(func(tx *Tx) error {
 		grandchild1 := tx.Bucket(parentName).Bucket(childName).Bucket(grandchildName1)
 		var v1 []byte
-		grandchild1.Get(grandchildKey1, &v1)
+		must.Error(t, grandchild1.Get(grandchildKey1, &v1))
+		must.Error(t, grandchild1.Get(grandchildKey1, &v1))
 		must.Eq(t, ([]byte)(nil), v1)
 
 		grandchild2 := tx.Bucket(parentName).Bucket(childName).Bucket(grandchildName2)
