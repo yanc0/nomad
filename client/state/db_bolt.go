@@ -752,7 +752,7 @@ func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
 		if err := boltdd.Iterate(bkt, nil, func(key []byte, qr structs.CheckQueryResult) {
 			parts := bytes.SplitN(key, []byte("_"), 2)
 			allocID, checkID := parts[0], parts[1]
-			netlog.White(" id: %s, check: %s, qr: %s", string(allocID), string(checkID), qr)
+			netlog.White(" id: %s, check: %s, qr: %v", string(allocID), string(checkID), qr)
 			m.Insert(string(allocID), &qr)
 		}); err != nil {
 			return err

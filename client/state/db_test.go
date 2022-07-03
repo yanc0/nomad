@@ -13,9 +13,11 @@ import (
 	"github.com/hashicorp/nomad/client/dynamicplugins"
 	driverstate "github.com/hashicorp/nomad/client/pluginmanager/drivermanager/state"
 	"github.com/hashicorp/nomad/helper/testlog"
+	"github.com/hashicorp/nomad/helper/uuid"
 	"github.com/hashicorp/nomad/nomad/mock"
 	"github.com/hashicorp/nomad/nomad/structs"
 	"github.com/kr/pretty"
+	"github.com/shoenig/test/must"
 	"github.com/stretchr/testify/require"
 )
 
@@ -379,6 +381,37 @@ func TestStateDB_DynamicRegistry(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(ps)
 		require.Equal(state, ps)
+	})
+}
+
+func TestStateDB_CheckResult_PutGet(t *testing.T) {
+	ci.Parallel(t)
+
+	allocID := uuid.Generate()
+
+	qr := func(id string) *structs.CheckQueryResult {
+		return &structs.CheckQueryResult{
+			ID:        structs.CheckID(id),
+			Mode:      "healthiness",
+			Status:    "passing",
+			Output:    "nomad: tcp ok",
+			Timestamp: 1111,
+			Group:     "group",
+			Task:      "task",
+			Service:   "service",
+			Check:     "check",
+		}
+	}
+
+	testDB(t, func(t *testing.T, db StateDB) {
+		t.Run("put get one", func(t *testing.T) {
+			err := db.PutCheckResult(allocID, qr("abc123"))
+			must.NoError(t, err)
+			results, err := db.GetCheckResults()
+			must.NoError(t, err)
+			must.MapContainsKeys(t, results, []string{allocID})
+			must.MapContainsKeys(t, results[allocID], []structs.CheckID{"abc123"})
+		})
 	})
 }
 

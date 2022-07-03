@@ -55,6 +55,7 @@ func NewMemDB(logger hclog.Logger) *MemDB {
 		networkStatus:  make(map[string]*structs.AllocNetworkStatus),
 		localTaskState: make(map[string]map[string]*state.LocalState),
 		taskState:      make(map[string]map[string]*structs.TaskState),
+		checks:         make(checks.ClientResults),
 		logger:         logger,
 	}
 }
@@ -246,6 +247,10 @@ func (m *MemDB) PutDynamicPluginRegistryState(ps *dynamicplugins.RegistryState) 
 func (m *MemDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if _, exists := m.checks[allocID]; !exists {
+		m.checks[allocID] = make(checks.AllocationResults)
+	}
 
 	m.checks[allocID][qr.ID] = qr
 	return nil
