@@ -88,3 +88,10 @@ func (m AllocationResults) diff(ids []structs.CheckID) []structs.CheckID {
 // ClientResults is a holistic view of alloc_id -> check_id -> latest result
 // group and task checks across all allocations on a client.
 type ClientResults map[string]AllocationResults
+
+func (cr ClientResults) Insert(allocID string, result *structs.CheckQueryResult) {
+	if _, exists := cr[allocID]; !exists {
+		cr[allocID] = make(AllocationResults)
+	}
+	cr[allocID][result.ID] = result
+}

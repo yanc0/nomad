@@ -42,11 +42,13 @@ type shim struct {
 
 // NewStore creates a new store.
 func NewStore(log hclog.Logger, db state.StateDB) Shim {
-	return &shim{
+	s := &shim{
 		log:     log.Named("check_store"),
 		db:      db,
 		current: make(checks.ClientResults),
 	}
+	s.restore()
+	return s
 }
 
 func (s *shim) restore() {
@@ -85,7 +87,11 @@ func (s *shim) Set(allocID string, qr *structs.CheckQueryResult) error {
 		s.current[allocID] = make(map[structs.CheckID]*structs.CheckQueryResult)
 	}
 
-	s.current[allocID][qr.ID] = qr
+	_, exists := s.current[allocID][qr.ID]
+	if qr.Status != structs.CheckPending || !exists {
+		// only insert stub if nothing already set
+		s.current[allocID][qr.ID] = qr
+	}
 
 	return s.db.PutCheckResult(allocID, qr)
 }

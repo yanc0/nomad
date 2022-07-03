@@ -1,8 +1,8 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/hashicorp/nomad/helper"
 	"os"
 	"path/filepath"
 	"time"
@@ -741,38 +741,42 @@ func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResul
 // GetCheckResults gets the check results associated with allocID from the state store.
 func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
 	netlog.White("BoltStateDB.GetCheckResults")
-	var m checks.ClientResults
+	m := make(checks.ClientResults)
 
 	err := s.db.View(func(tx *boltdd.Tx) error {
 		bkt := tx.Bucket(checkResultsBucket)
 		if bkt == nil {
 			return fmt.Errorf("missing %s bucket", string(checkResultsBucket))
 		}
-		if err := bkt.Iterate(func(id []byte) error {
-			var ar checks.AllocationResults
-			if err := bkt.Get(id, &ar); err != nil {
+		if err := bkt.Iterate(func(key []byte) error {
+			parts := bytes.SplitN(key, []byte("_"), 2)
+			allocID, checkID := parts[0], parts[1]
+			netlog.White(" id: %s, check: %s", string(allocID), string(checkID))
+			var r structs.CheckQueryResult
+			if err := bkt.Get(key, &r); err != nil {
 				return err
 			}
-			m[string(id)] = helper.CopyMap(ar)
+			m.Insert(string(allocID), &r)
 			return nil
 		}); err != nil {
 			return err
 		}
-
 		return nil
 	})
 	return m, err
 }
 
 func (s *BoltStateDB) DeleteCheckResults(allocID string, checkIDs []structs.CheckID) error {
-	netlog.Red("BoltStateDB.DeleteCheckResults not yet implemented")
-	// todo
+	netlog.White("BoltStateDB.DeleteCheckResults id: %s, ids: %s", allocID, checkIDs)
+	// YOU ARE HERE
+	panic("not implemented")
 	return nil
 }
 
 func (s *BoltStateDB) PurgeCheckResults(allocID string) error {
-	netlog.Red("BoltStateDB.PurgeCheckResults not yet implemented")
-	// todo
+	netlog.White("BoltStateDB.PurgeCheckResults id: %s", allocID)
+	// AND HERE
+	panic("not implemented")
 	return nil
 }
 
