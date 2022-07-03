@@ -749,19 +749,11 @@ func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
 
 	err := s.db.View(func(tx *boltdd.Tx) error {
 		bkt := tx.Bucket(checkResultsBucket)
-		if bkt == nil {
-			return fmt.Errorf("missing %s bucket", string(checkResultsBucket))
-		}
-		if err := bkt.Iterate(func(key []byte) error {
+		if err := boltdd.Iterate(bkt, nil, func(key []byte, qr structs.CheckQueryResult) {
 			parts := bytes.SplitN(key, []byte("_"), 2)
 			allocID, checkID := parts[0], parts[1]
-			netlog.White(" id: %s, check: %s", string(allocID), string(checkID))
-			var r structs.CheckQueryResult
-			if err := bkt.Get(key, &r); err != nil {
-				return err
-			}
-			m.Insert(string(allocID), &r)
-			return nil
+			netlog.White(" id: %s, check: %s, qr: %s", string(allocID), string(checkID), qr)
+			m.Insert(string(allocID), &qr)
 		}); err != nil {
 			return err
 		}
