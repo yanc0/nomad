@@ -725,6 +725,10 @@ func (s *BoltStateDB) GetDynamicPluginRegistryState() (*dynamicplugins.RegistryS
 	return ps, nil
 }
 
+func keyForCheck(allocID string, checkID structs.CheckID) []byte {
+	return []byte(fmt.Sprintf("%s_%s", allocID, checkID))
+}
+
 // PutCheckResult puts qr into the state store.
 func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResult) error {
 	netlog.White("BoltStateDB.PutCheckResult id: %s, qr: %s", allocID, qr)
@@ -733,8 +737,8 @@ func (s *BoltStateDB) PutCheckResult(allocID string, qr *structs.CheckQueryResul
 		if err != nil {
 			return err
 		}
-		key := fmt.Sprintf("%s_%s", allocID, qr.ID)
-		return bkt.Put([]byte(key), qr)
+		key := keyForCheck(allocID, qr.ID)
+		return bkt.Put(key, qr)
 	})
 }
 
@@ -768,16 +772,24 @@ func (s *BoltStateDB) GetCheckResults() (checks.ClientResults, error) {
 
 func (s *BoltStateDB) DeleteCheckResults(allocID string, checkIDs []structs.CheckID) error {
 	netlog.White("BoltStateDB.DeleteCheckResults id: %s, ids: %s", allocID, checkIDs)
-	// YOU ARE HERE
-	panic("not implemented")
-	return nil
+	return s.db.Update(func(tx *boltdd.Tx) error {
+		bkt := tx.Bucket(checkResultsBucket)
+		for _, id := range checkIDs {
+			key := keyForCheck(allocID, id)
+			if err := bkt.Delete(key); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *BoltStateDB) PurgeCheckResults(allocID string) error {
 	netlog.White("BoltStateDB.PurgeCheckResults id: %s", allocID)
-	// AND HERE
-	panic("not implemented")
-	return nil
+	return s.db.Update(func(tx *boltdd.Tx) error {
+		bkt := tx.Bucket(checkResultsBucket)
+		return bkt.DeletePrefix([]byte(allocID + "_"))
+	})
 }
 
 // init initializes metadata entries in a newly created state database.
