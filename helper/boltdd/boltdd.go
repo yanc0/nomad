@@ -353,32 +353,6 @@ func (b *Bucket) Get(key []byte, obj interface{}) error {
 	return nil
 }
 
-// Iterate iterates every key in Bucket b. Caller should then use b.Get to retrieve
-// the message-pack decoded value associated with k within each call of fn.
-func (b *Bucket) Iterate(fn func(k []byte) error) error {
-	c := b.boltBucket.Cursor()
-	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		if err := fn(k); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// DeletePrefix removes all keys starting with prefix from the bucket. If no keys
-// with prefix exist then nothing is done and a nil error is returned. Returns an
-// error if the bucket was created from a read-only transaction.
-func (b *Bucket) DeletePrefix(prefix []byte) error {
-	c := b.boltBucket.Cursor()
-	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-		if err := c.Delete(); err != nil {
-			return err
-		}
-		b.bm.delHash(string(k))
-	}
-	return nil
-}
-
 // Delete removes a key from the bucket. If the key does not exist then nothing
 // is done and a nil error is returned. Returns an error if the bucket was
 // created from a read-only transaction.
