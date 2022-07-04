@@ -389,11 +389,28 @@ func (e *Eval) List(args *structs.EvalListRequest,
 	}
 	defer metrics.MeasureSince([]string{"nomad", "eval", "list"}, time.Now())
 
+	namespace := args.RequestNamespace()
+	var allow func(string) bool
+
 	// Check for read-job permissions
-	if aclObj, err := e.srv.ResolveToken(args.AuthToken); err != nil {
+	aclObj, err := e.srv.ResolveToken(args.AuthToken)
+	switch {
+	case err != nil:
 		return err
-	} else if aclObj != nil && !aclObj.AllowNsOp(args.RequestNamespace(), acl.NamespaceCapabilityReadJob) {
+	case aclObj == nil:
+		allow = func(string) bool {
+			return true
+		}
+	case namespace == structs.AllNamespacesSentinel:
+		allow = func(ns string) bool {
+			return aclObj.AllowNsOp(ns, acl.NamespaceCapabilityReadJob)
+		}
+	case !aclObj.AllowNsOp(namespace, acl.NamespaceCapabilityReadJob):
 		return structs.ErrPermissionDenied
+	default:
+		allow = func(string) bool {
+			return true
+		}
 	}
 
 	// Setup the blocking query
@@ -404,34 +421,48 @@ func (e *Eval) List(args *structs.EvalListRequest,
 			// Scan all the evaluations
 			var err error
 			var iter memdb.ResultIterator
-			if args.RequestNamespace() == structs.AllNamespacesSentinel {
-				iter, err = store.Evals(ws)
-			} else if prefix := args.QueryOptions.Prefix; prefix != "" {
-				iter, err = store.EvalsByIDPrefix(ws, args.RequestNamespace(), prefix)
-			} else {
-				iter, err = store.EvalsByNamespace(ws, args.RequestNamespace())
-			}
-			if err != nil {
+
+			// check if user has permission to all namespaces
+			allowableNamespaces, err := allowedNSes(aclObj, store, allow)
+			if err == structs.ErrPermissionDenied {
+				// return empty evals if token isn't authorized for any
+				// namespace, matching other endpoints
+				reply.Evaluations = make([]*structs.Evaluation, 0)
+			} else if err != nil {
 				return err
-			}
-
-			iter = memdb.NewFilterIterator(iter, func(raw interface{}) bool {
-				if eval := raw.(*structs.Evaluation); eval != nil {
-					return args.ShouldBeFiltered(eval)
+			} else {
+				if args.RequestNamespace() == structs.AllNamespacesSentinel {
+					iter, err = store.Evals(ws)
+				} else if prefix := args.QueryOptions.Prefix; prefix != "" {
+					iter, err = store.EvalsByIDPrefix(ws, args.RequestNamespace(), prefix)
+				} else {
+					iter, err = store.EvalsByNamespace(ws, args.RequestNamespace())
 				}
-				return false
-			})
+				if err != nil {
+					return err
+				}
 
-			var evals []*structs.Evaluation
-			paginator := state.NewPaginator(iter, args.QueryOptions,
-				func(raw interface{}) {
-					eval := raw.(*structs.Evaluation)
-					evals = append(evals, eval)
+				iter = memdb.NewFilterIterator(iter, func(raw interface{}) bool {
+					if eval := raw.(*structs.Evaluation); eval != nil {
+						nsAllowed := allowableNamespaces == nil ||
+							allowableNamespaces[eval.Namespace]
+
+						return !nsAllowed || args.ShouldBeFiltered(eval)
+					}
+					return false
 				})
 
-			nextToken := paginator.Page()
-			reply.QueryMeta.NextToken = nextToken
-			reply.Evaluations = evals
+				var evals []*structs.Evaluation
+				paginator := state.NewPaginator(iter, args.QueryOptions,
+					func(raw interface{}) {
+						eval := raw.(*structs.Evaluation)
+						evals = append(evals, eval)
+					})
+
+				nextToken := paginator.Page()
+				reply.QueryMeta.NextToken = nextToken
+				reply.Evaluations = evals
+			}
 
 			// Use the last index that affected the jobs table
 			index, err := store.Index("evals")
